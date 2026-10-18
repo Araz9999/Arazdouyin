@@ -3,6 +3,7 @@ import type { Video } from '../api/types';
 import { createStore, useStore } from './reactive';
 import { authStore, currentUser, isAuthed, requireAuth } from './auth';
 import { toast } from './ui';
+import { t } from './i18n';
 
 export type FeedKind = 'recommend' | 'following';
 
@@ -136,7 +137,7 @@ async function requestPage(key: string, kind: FeedKind, cursor: string | null, f
     warmFollowFlags(key);
   } catch (err) {
     if (stale()) return;
-    const message = err instanceof Error ? err.message : '加载失败';
+    const message = err instanceof Error ? err.message : t('err_load_failed');
     store.set((s) => ({
       metas: { ...s.metas, [key]: { ...(s.metas[key] ?? IDLE_META), status: 'error', error: message, loadingMore: false } }
     }));
@@ -214,7 +215,7 @@ export function toggleLike(video: Video) {
       })
       .catch(() => {
         patchVideo(video.id, (v) => ({ ...v, liked: prevLiked, stats: { ...v.stats, likes: prevLikes } }));
-        toast('操作失败，请稍后重试', 'error');
+        toast(t('op_failed'), 'error');
       });
   });
 }
@@ -242,7 +243,7 @@ export function toggleFavorite(video: Video) {
           favorited: prevOn,
           stats: { ...v.stats, favorites: prevCount }
         }));
-        toast('操作失败，请稍后重试', 'error');
+        toast(t('op_failed'), 'error');
       });
   });
 }
@@ -256,7 +257,7 @@ export function toggleFollow(authorId: string) {
       .then((res) => patchAuthor(authorId, typeof res?.following === 'boolean' ? res.following : on))
       .catch(() => {
         patchAuthor(authorId, !on);
-        toast(on ? '关注失败' : '取消关注失败', 'error');
+        toast(on ? t('follow_failed') : t('unfollow_failed'), 'error');
       });
   });
 }
@@ -300,22 +301,57 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function shareVideo(video: Video) {
-  if (!isAuthed()) {
-    requireAuth(() => shareVideo(video));
-    return;
+export async function shareVideo(video: Video) {
+  const authorName = video.author.display_name || video.author.username;
+  const basePath = typeof window !== 'undefined' ? window.location.pathname.replace(/\/+$/, '') : '';
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const link = `${origin}${basePath}/#/video/${video.id}`;
+  const shareTitle = video.caption ? `${video.caption} - ${authorName}` : `FastVideo - @${authorName}`;
+  const shareText = video.caption ? `${video.caption} (@${authorName})` : t('share_text_template', { author: authorName });
+
+  let sharedViaNative = false;
+
+  // 1. Attempt platform-native share intent via Web Share API
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    const shareData = {
+      title: shareTitle,
+      text: shareText,
+      url: link,
+    };
+    try {
+      if (!navigator.canShare || navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        sharedViaNative = true;
+        toast(t('share_success'), 'ok');
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        // User cancelled/dismissed native share dialog
+        return;
+      }
+      // If native share threw or failed, continue to clipboard fallback
+      sharedViaNative = false;
+    }
   }
-  const link = `${location.origin}/#/video/${video.id}`;
-  /* A denied clipboard must not swallow the action: the share is counted either way, and when
-     the copy fails the toast shows the link itself instead of an error the user can't act on. */
-  void copyText(link).then((copied) => toast(copied ? '链接已复制' : link, copied ? 'ok' : 'info'));
+
+  // 2. Fall back to copying the current video link to the clipboard
+  if (!sharedViaNative) {
+    const copied = await copyText(link);
+    toast(copied ? t('link_copied') : link, copied ? 'ok' : 'info');
+  }
+
+  // 3. Optimistically update video share counter in the feed
   const baseline = findVideo(store.get(), video.id) ?? video;
   const prev = baseline.stats.shares;
   patchVideo(video.id, (v) => ({ ...v, stats: { ...v.stats, shares: v.stats.shares + 1 } }));
-  videoApi.share(video.id).then(
-    (res) => patchVideo(video.id, (v) => ({ ...v, stats: { ...v.stats, shares: res.shares } })),
-    () => patchVideo(video.id, (v) => ({ ...v, stats: { ...v.stats, shares: prev } }))
-  );
+
+  // 4. Persist share count to backend if authenticated
+  if (isAuthed()) {
+    videoApi.share(video.id).then(
+      (res) => patchVideo(video.id, (v) => ({ ...v, stats: { ...v.stats, shares: res.shares } })),
+      () => patchVideo(video.id, (v) => ({ ...v, stats: { ...v.stats, shares: prev } }))
+    );
+  }
 }
 
 const viewed = new Set<string>();

@@ -10,7 +10,10 @@ import { useAsync } from '../hooks/useAsync';
 import { useSelf } from '../store/auth';
 import { timeAgo } from '../utils/format';
 
+import { useI18n } from '../store/i18n';
+
 export default function MessagesPage({ params }: RouteProps) {
+  const { t } = useI18n();
   const peer = params.peer ?? '';
   const me = useSelf();
   const convs = useAsync<Conversation[]>(() => chatApi.conversations(), []);
@@ -86,11 +89,11 @@ export default function MessagesPage({ params }: RouteProps) {
     <div className="msg-page">
       <aside className={`conv-list${peer ? ' hide-mobile' : ''}`}>
         <div className="page-head tight">
-          <h1>私信</h1>
+          <h1>{t('msg_title')}</h1>
         </div>
-        {convs.loading && !items.length ? <Loading label="加载会话" /> : null}
+        {convs.loading && !items.length ? <Loading label={t('msg_conv_loading')} /> : null}
         {convs.error && !items.length ? <ErrorState text={convs.error} onRetry={convs.reload} /> : null}
-        {!convs.loading && !items.length ? <EmptyState text="还没有会话" hint="在作者主页点「私信」开始聊天" /> : null}
+        {!convs.loading && !items.length ? <EmptyState text={t('msg_conv_empty')} hint={t('msg_conv_empty_hint')} /> : null}
         {items.map((c) => (
           <button
             key={c.peer.id}
@@ -100,7 +103,7 @@ export default function MessagesPage({ params }: RouteProps) {
             <Avatar user={c.peer} size={40} />
             <div className="conv-main">
               <p className="conv-name">{c.peer.display_name || c.peer.username}</p>
-              <p className="conv-last">{c.last?.content ?? '暂无消息'}</p>
+              <p className="conv-last">{c.last?.content ?? t('msg_last_empty')}</p>
             </div>
             {c.unread > 0 ? <span className="badge">{c.unread}</span> : null}
           </button>
@@ -109,21 +112,21 @@ export default function MessagesPage({ params }: RouteProps) {
       <section className={`thread${peer ? ' show-mobile' : ''}`}>
         {!peer ? (
           <div className="thread-empty">
-            <p>选择一个会话开始聊天</p>
+            <p>{t('msg_select_chat')}</p>
           </div>
         ) : (
           <>
             <header className="thread-head">
-              <button className="icon-btn only-mobile" onClick={() => navigate('/messages')} aria-label="返回列表">
+              <button className="icon-btn only-mobile" onClick={() => navigate('/messages')} aria-label={t('vp_back')}>
                 <BackIcon size={20} />
               </button>
-              <strong>{peerName || '对话'}</strong>
-              {me ? <span className="thread-sub">和 {me.display_name || me.username} 的对话</span> : null}
+              <strong>{peerName || t('msg_title')}</strong>
+              {me ? <span className="thread-sub">{t('msg_chat_with')} {me.display_name || me.username}</span> : null}
             </header>
             <div className="bubbles" ref={listRef}>
-              {status === 'loading' ? <Loading label="加载消息" /> : null}
-              {status === 'error' ? <ErrorState text="消息加载失败" /> : null}
-              {status === 'ready' && !thread.length ? <EmptyState text="还没有消息" hint="发一条打个招呼" /> : null}
+              {status === 'loading' ? <Loading label={t('msg_conv_loading')} /> : null}
+              {status === 'error' ? <ErrorState text={t('msg_load_failed')} /> : null}
+              {status === 'ready' && !thread.length ? <EmptyState text={t('msg_no_messages')} hint={t('msg_say_hi')} /> : null}
               {thread.map((m) => (
                 <div key={m.id} className={`bubble-row${m.from_me ? ' me' : ''}`}>
                   <div className="bubble">
@@ -136,14 +139,14 @@ export default function MessagesPage({ params }: RouteProps) {
             <footer className="thread-foot">
               <input
                 value={text}
-                placeholder="发送消息…"
-                aria-label="消息内容"
+                placeholder={t('msg_input_placeholder')}
+                aria-label={t('msg_title')}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') send();
                 }}
               />
-              <button className="send-btn" onClick={send} disabled={sending || !text.trim()} aria-label="发送">
+              <button className="send-btn" onClick={send} disabled={sending || !text.trim()} aria-label={t('comments_send')}>
                 {sending ? <SpinnerIcon size={18} /> : <SendIcon size={19} />}
               </button>
             </footer>

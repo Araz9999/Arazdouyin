@@ -2,8 +2,10 @@ import type { Video } from '../api/types';
 import { formatCount, formatDuration } from '../utils/format';
 import { navigate } from '../router/router';
 import { PlayIcon } from './icons';
+import { useI18n } from '../store/i18n';
 
 export function ThumbGrid({ items }: { items: Video[] }) {
+  const { t } = useI18n();
   if (!items.length) return null;
   return (
     <div className="thumb-grid">
@@ -15,7 +17,7 @@ export function ThumbGrid({ items }: { items: Video[] }) {
             {formatCount(v.stats.views)}
           </span>
           <span className="thumb-dur">{formatDuration(v.duration)}</span>
-          <span className="thumb-cap">{v.caption || '暂无描述'}</span>
+          <span className="thumb-cap">{v.caption || t('no_caption')}</span>
         </button>
       ))}
     </div>

@@ -10,8 +10,10 @@ import { SearchIcon, VerifiedIcon } from '../components/icons';
 import { formatCount } from '../utils/format';
 import { toggleFollow, useIsFollowing } from '../store/feed';
 import { requireAuth } from '../store/auth';
+import { useI18n } from '../store/i18n';
 
 function UserCell({ user }: { user: User }) {
+  const { t } = useI18n();
   const following = useIsFollowing(user.id);
   return (
     <div className="user-cell">
@@ -21,19 +23,20 @@ function UserCell({ user }: { user: User }) {
           {user.display_name || user.username}
           {user.verified ? <VerifiedIcon size={14} /> : null}
         </button>
-        <p className="user-cell-sub">@{user.username} · {formatCount(user.follower_count)}粉丝</p>
+        <p className="user-cell-sub">@{user.username} · {formatCount(user.follower_count)} {t('user_stat_followers')}</p>
       </div>
       <button
         className={`btn pill small ${following ? 'ghost' : 'accent'}`}
         onClick={() => requireAuth(() => toggleFollow(user.id))}
       >
-        {following ? '已关注' : '关注'}
+        {following ? t('action_following') : `+ ${t('action_follow')}`}
       </button>
     </div>
   );
 }
 
 export default function SearchPage({ route }: RouteProps) {
+  const { t } = useI18n();
   const q = route.query.get('q') ?? '';
   const [videos, setVideos] = useState<Video[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -71,11 +74,11 @@ export default function SearchPage({ route }: RouteProps) {
       })
       .catch((err: unknown) => {
         if (ctrl.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
-        setError(err instanceof Error ? err.message : '搜索失败');
+        setError(err instanceof Error ? err.message : t('op_failed'));
         setLoading(false);
       });
     return () => ctrl.abort();
-  }, [q, nonce]);
+  }, [q, nonce, t]);
 
   const more = () => {
     if (!cursor || loading) return;
@@ -90,24 +93,24 @@ export default function SearchPage({ route }: RouteProps) {
         setVideos((v) => [...v, ...res.videos]);
         setCursor(res.nextCursor);
       })
-      .catch(() => setError('加载更多失败'))
+      .catch(() => setError(t('op_failed')))
       .finally(() => setLoading(false));
   };
 
-  if (!q.trim()) return <EmptyState text="输入关键词开始搜索" hint="支持用户名、昵称和视频描述" />;
+  if (!q.trim()) return <EmptyState text={t('search_empty_input')} hint={t('search_empty_input_hint')} />;
   if (error && !videos.length) return <ErrorState text={error} onRetry={() => setNonce((n) => n + 1)} />;
-  if (loading && !videos.length && !users.length) return <Loading label={`搜索 ${q}`} />;
+  if (loading && !videos.length && !users.length) return <Loading label={t('search_loading')} />;
 
   return (
     <div className="search-page">
       <div className="page-head">
         <SearchIcon className="head-ico" />
-        <h1>“{q}” 的结果</h1>
-        <span className="head-count">{formatCount(videos.length + users.length)} 条</span>
+        <h1>{t('search_results_title', { query: q })}</h1>
+        <span className="head-count">{t('search_results_count', { count: formatCount(videos.length + users.length) })}</span>
       </div>
       {users.length ? (
         <section className="section">
-          <h2 className="section-title">用户</h2>
+          <h2 className="section-title">{t('search_section_users')}</h2>
           <div className="user-list">
             {users.map((u) => (
               <UserCell key={u.id} user={u} />
@@ -116,11 +119,11 @@ export default function SearchPage({ route }: RouteProps) {
         </section>
       ) : null}
       <section className="section">
-        <h2 className="section-title">视频</h2>
-        {videos.length ? <ThumbGrid items={videos} /> : <EmptyState text="没有匹配的视频" />}
+        <h2 className="section-title">{t('search_section_videos')}</h2>
+        {videos.length ? <ThumbGrid items={videos} /> : <EmptyState text={t('search_no_videos')} />}
         {cursor ? (
           <button className="btn ghost block" onClick={more} disabled={loading}>
-            {loading ? '加载中…' : '加载更多'}
+            {loading ? t('state_loading') : t('search_load_more')}
           </button>
         ) : null}
       </section>

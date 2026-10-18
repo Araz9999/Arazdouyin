@@ -6,6 +6,7 @@ import { CommentIcon, DiscIcon, HeartIcon, ShareIcon, StarIcon, PlusIcon, Verifi
 import { openComments } from '../store/ui';
 import { shareVideo, toggleFavorite, toggleFollow, toggleLike } from '../store/feed';
 import { navigate } from '../router/router';
+import { useI18n } from '../store/i18n';
 
 type Props = { video: Video };
 
@@ -39,6 +40,7 @@ function RailButton({
 }
 
 export const ActionRail = memo(function ActionRail({ video }: Props) {
+  const { t } = useI18n();
   const author = video.author;
   /* stable handler so the Avatar memo actually holds across rail re-renders */
   const openAuthor = useCallback(() => navigate(`/user/${author.id}`), [author.id]);
@@ -47,28 +49,28 @@ export const ActionRail = memo(function ActionRail({ video }: Props) {
       <div className="rail-avatar">
         <Avatar user={author} size={46} onClick={openAuthor} />
         {!video.following ? (
-          <button className="follow-badge" title="关注" aria-label="关注" onClick={() => toggleFollow(author.id)}>
+          <button className="follow-badge" title={t('action_follow')} aria-label={t('action_follow')} onClick={() => toggleFollow(author.id)}>
             <PlusIcon size={13} strokeWidth={2.6} />
           </button>
         ) : (
-          <span className="follow-badge done">
+          <span className="follow-badge done" title={t('action_following')}>
             <PlusIcon size={13} strokeWidth={2.6} />
           </span>
         )}
       </div>
-      <RailButton label="点赞" count={video.stats.likes} on={video.liked} tone="like" onClick={() => toggleLike(video)}>
+      <RailButton label={t('action_like')} count={video.stats.likes} on={video.liked} tone="like" onClick={() => toggleLike(video)}>
         <HeartIcon size={30} on={video.liked} />
       </RailButton>
-      <RailButton label="评论" count={video.stats.comments} onClick={() => openComments(video)}>
+      <RailButton label={t('action_comment')} count={video.stats.comments} onClick={() => openComments(video)}>
         <CommentIcon size={29} />
       </RailButton>
-      <RailButton label="收藏" count={video.stats.favorites} on={video.favorited} tone="fav" onClick={() => toggleFavorite(video)}>
+      <RailButton label={t('action_favorite')} count={video.stats.favorites} on={video.favorited} tone="fav" onClick={() => toggleFavorite(video)}>
         <StarIcon size={29} on={video.favorited} />
       </RailButton>
-      <RailButton label="分享" count={video.stats.shares} onClick={() => shareVideo(video)}>
+      <RailButton label={t('action_share')} count={video.stats.shares} tone="share" onClick={() => shareVideo(video)}>
         <ShareIcon size={28} />
       </RailButton>
-      <div className="rail-disc" title={`${author.display_name || author.username} 的原声`}>
+      <div className="rail-disc" title={`${author.display_name || author.username} ${t('feed_original_sound')}`}>
         <DiscIcon size={40} className="spinning" />
       </div>
       {author.verified ? (

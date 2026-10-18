@@ -1,30 +1,32 @@
+import { t } from '../store/i18n';
+
 export function clamp(n: number, min: number, max: number): number {
   return n < min ? min : n > max ? max : n;
 }
 
 export function formatCount(n: number): string {
-  if (!Number.isFinite(n) || n <= 0) return n === 0 ? '0' : '0';
-  if (n < 10000) return String(Math.round(n));
-  if (n < 100000000) {
-    const w = n / 10000;
-    return `${w >= 100 ? Math.round(w) : w.toFixed(1).replace(/\.0$/, '')}万`;
+  if (!Number.isFinite(n) || n <= 0) return '0';
+  if (n < 1000) return String(Math.round(n));
+  if (n < 1000000) {
+    const k = n / 1000;
+    return `${k >= 100 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, '')}${t('count_k')}`;
   }
-  return `${(n / 100000000).toFixed(1)}亿`;
+  return `${(n / 1000000).toFixed(1).replace(/\.0$/, '')}${t('count_m')}`;
 }
 
 export function timeAgo(ts: number | string): string {
-  const t = typeof ts === 'number' ? ts : Date.parse(ts);
-  if (!Number.isFinite(t)) return '';
-  const diff = Math.max(0, Date.now() - t);
+  const tTime = typeof ts === 'number' ? ts : Date.parse(ts);
+  if (!Number.isFinite(tTime)) return '';
+  const diff = Math.max(0, Date.now() - tTime);
   const min = 60000;
   const hour = 3600000;
   const day = 86400000;
-  if (diff < 45000) return '刚刚';
-  if (diff < hour) return `${Math.floor(diff / min)}分钟前`;
-  if (diff < day) return `${Math.floor(diff / hour)}小时前`;
-  if (diff < 7 * day) return `${Math.floor(diff / day)}天前`;
-  const d = new Date(t);
-  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (diff < 45000) return t('time_just_now');
+  if (diff < hour) return t('time_mins_ago', { n: Math.floor(diff / min) });
+  if (diff < day) return t('time_hours_ago', { n: Math.floor(diff / hour) });
+  if (diff < 7 * day) return t('time_days_ago', { n: Math.floor(diff / day) });
+  const d = new Date(tTime);
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 }
 
 export function formatDuration(sec: number): string {

@@ -12,14 +12,17 @@ import { setSound, useSoundOn } from '../store/ui';
 /* docs-perf-notes: the HUD is the only thing on this page that cares about the speaker
    toggle, so it owns that subscription. Before, a sound flip re-rendered FeedPage and
    cascaded into the scroller + every card. */
+import { useI18n } from '../store/i18n';
+
 function FeedHud({ feedKey: key, kind }: { feedKey: string; kind: FeedKind }) {
+  const { t } = useI18n();
   const soundOn = useSoundOn();
   return (
     <div className="feed-hud">
       <button
         className="hud-btn"
-        title={soundOn ? '静音' : '外放'}
-        aria-label={soundOn ? '静音' : '外放'}
+        title={soundOn ? t('action_sound_off') : t('action_sound_on')}
+        aria-label={soundOn ? t('action_sound_off') : t('action_sound_on')}
         aria-pressed={!soundOn}
         onClick={() => setSound(!soundOn)}
       >
@@ -31,12 +34,13 @@ function FeedHud({ feedKey: key, kind }: { feedKey: string; kind: FeedKind }) {
 }
 
 function FeedRefreshButton({ feedKey: key, kind }: { feedKey: string; kind: FeedKind }) {
+  const { t } = useI18n();
   const { status } = useFeedMeta(key);
   return (
     <button
       className="hud-btn"
-      title="刷新当前 feed"
-      aria-label="刷新当前 feed"
+      title={t('action_refresh')}
+      aria-label={t('action_refresh')}
       onClick={() => refreshFeed(key, kind)}
       disabled={status === 'loading'}
     >
@@ -46,6 +50,7 @@ function FeedRefreshButton({ feedKey: key, kind }: { feedKey: string; kind: Feed
 }
 
 export default function FeedPage({ params }: RouteProps) {
+  const { t } = useI18n();
   const kind: FeedKind = params.mode === 'following' ? 'following' : 'recommend';
   const key = feedKey(kind);
   const items = useFeedItems(key);
@@ -60,34 +65,32 @@ export default function FeedPage({ params }: RouteProps) {
   const needLogin = kind === 'following' && status === 'anon';
   const { status: feedStatus, error: feedError } = meta;
 
-  /* memoised so an unrelated FeedPage re-render (new meta, a toast elsewhere) cannot hand
-     FeedScroller a fresh element and defeat its memo() bailout */
   const empty = useMemo(
     () =>
       needLogin ? (
         <EmptyState
-          text="登录后可以看到关注人的视频"
+          text={t('feed_empty_following')}
           action={
             <button className="btn accent pill" onClick={() => navigate('/login')}>
-              立即登录
+              {t('nav_login')}
             </button>
           }
         />
       ) : feedStatus === 'loading' || (feedStatus === 'idle' && items.length === 0) ? (
-        <Loading label="正在为你准备视频" />
+        <Loading label={t('feed_preparing')} />
       ) : feedStatus === 'error' ? (
-        <ErrorState text={feedError ?? '加载失败'} onRetry={() => refreshFeed(key, kind)} />
+        <ErrorState text={feedError ?? t('comments_load_failed')} onRetry={() => refreshFeed(key, kind)} />
       ) : (
-        <EmptyState text="这里还没有内容" hint={kind === 'following' ? '去关注一些创作者吧' : undefined} />
+        <EmptyState text={t('feed_empty_recommend')} hint={kind === 'following' ? t('feed_empty_following_hint') : undefined} />
       ),
-    [needLogin, feedStatus, feedError, items.length, key, kind]
+    [needLogin, feedStatus, feedError, items.length, key, kind, t]
   );
 
   return (
     <>
       <FeedScroller feedKey={key} kind={kind} items={items} empty={empty} />
       <FeedHud feedKey={key} kind={kind} />
-      {meta.loadingMore ? <div className="feed-more">正在加载更多…</div> : null}
+      {meta.loadingMore ? <div className="feed-more">{t('feed_loading_more')}</div> : null}
     </>
   );
 }

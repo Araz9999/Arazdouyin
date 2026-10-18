@@ -2,8 +2,10 @@ import { useEffect } from 'react';
 import { closeAuthSheet, useAuthSheet } from '../store/auth';
 import { AuthForm } from './AuthForm';
 import { CloseIcon } from './icons';
+import { useI18n } from '../store/i18n';
 
 export function AuthSheet() {
+  const { t } = useI18n();
   const sheetOpen = useAuthSheet();
 
   useEffect(() => {
@@ -18,13 +20,13 @@ export function AuthSheet() {
   return (
     <div className={`sheet-root ${sheetOpen ? 'open' : ''}`} aria-hidden={!sheetOpen}>
       <div className="sheet-backdrop" onClick={closeAuthSheet} />
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="登录">
-        <button className="sheet-close icon-btn" onClick={closeAuthSheet} aria-label="关闭">
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={t('auth_btn_login')}>
+        <button className="sheet-close icon-btn" onClick={closeAuthSheet} aria-label={t('action_cancel')}>
           <CloseIcon size={20} />
         </button>
         <div className="sheet-head">
-          <h2>登录后继续</h2>
-          <p>点赞、评论、关注和上传都需要先登录。</p>
+          <h2>{t('auth_sheet_title')}</h2>
+          <p>{t('auth_sheet_desc')}</p>
         </div>
         <AuthForm compact />
       </div>

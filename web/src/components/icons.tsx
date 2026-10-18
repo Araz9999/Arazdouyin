@@ -55,10 +55,13 @@ export function StarIcon({ size, className, on, strokeWidth }: IconProps) {
   );
 }
 
-export function ShareIcon({ size, className, on, strokeWidth }: IconProps) {
+export function ShareIcon({ size = 26, className, on = true, strokeWidth }: IconProps) {
   return (
     <Svg size={size} className={className} strokeWidth={on ? 0 : strokeWidth ?? 1.8}>
-      <path d="M12.6 4.2 20 11.5l-7.4 7.3v-3.6c-4.4 0-7.3 1.4-8.8 4.1.4-5.9 3.5-9 8.8-9.6Z" fill={on ? 'currentColor' : 'none'} />
+      <path
+        d="M13 4.5l7 7-7 7v-4c-5 0-8.5 1.5-11 5 1-5 4-10 11-11v-4Z"
+        fill="currentColor"
+      />
     </Svg>
   );
 }

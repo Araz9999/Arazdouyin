@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import { SpinnerIcon } from './icons';
+import { useI18n } from '../store/i18n';
 
-export function Loading({ label = '加载中' }: { label?: string }) {
+export function Loading({ label }: { label?: string }) {
+  const { t } = useI18n();
   return (
     <div className="state-block">
       <SpinnerIcon className="dim" size={26} />
-      <span>{label}</span>
+      <span>{label ?? t('state_loading')}</span>
     </div>
   );
 }
@@ -22,12 +24,13 @@ export function EmptyState({ text, hint, action }: { text: string; hint?: string
 }
 
 export function ErrorState({ text, onRetry }: { text: string; onRetry?: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="state-block error">
       <p>{text}</p>
       {onRetry ? (
         <button className="btn ghost small" onClick={onRetry}>
-          重新加载
+          {t('state_reload')}
         </button>
       ) : null}
     </div>

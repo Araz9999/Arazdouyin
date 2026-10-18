@@ -4,8 +4,10 @@ import { authStore } from '../store/auth';
 import { navigate } from '../router/router';
 import { toast } from '../store/ui';
 import { SpinnerIcon } from './icons';
+import { useI18n } from '../store/i18n';
 
 export function AuthForm({ compact = false }: { compact?: boolean }) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +19,7 @@ export function AuthForm({ compact = false }: { compact?: boolean }) {
     e.preventDefault();
     if (busy) return;
     if (!username.trim() || !password) {
-      setError('请填写用户名和密码');
+      setError(t('auth_error_required'));
       return;
     }
     setBusy(true);
@@ -27,13 +29,13 @@ export function AuthForm({ compact = false }: { compact?: boolean }) {
         mode === 'login'
           ? await login(username.trim(), password)
           : await register(username.trim(), password, displayName.trim() || undefined);
-      toast(`欢迎，${user.display_name || user.username}`, 'ok');
+      toast(t('welcome_user', { name: user.display_name || user.username }), 'ok');
       const pending = authStore.get().pending;
       closeAuthSheet();
       if (pending) pending();
       else if (window.location.hash.startsWith('#/login')) navigate('/my');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败');
+      setError(err instanceof Error ? err.message : t('auth_error_failed'));
     } finally {
       setBusy(false);
     }
@@ -43,38 +45,38 @@ export function AuthForm({ compact = false }: { compact?: boolean }) {
     <form className={`auth-form ${compact ? 'compact' : ''}`} onSubmit={submit}>
       <div className="auth-switch">
         <button type="button" className={mode === 'login' ? 'on' : ''} onClick={() => setMode('login')}>
-          登录
+          {t('auth_tab_login')}
         </button>
         <button type="button" className={mode === 'register' ? 'on' : ''} onClick={() => setMode('register')}>
-          注册
+          {t('auth_tab_register')}
         </button>
       </div>
       <label className="field">
-        <span>用户名</span>
-        <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="字母 / 数字 / 下划线" autoComplete="username" />
+        <span>{t('auth_username')}</span>
+        <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t('auth_username_placeholder')} autoComplete="username" />
       </label>
       {mode === 'register' ? (
         <label className="field">
-          <span>昵称</span>
-          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="选填" />
+          <span>{t('auth_display_name')}</span>
+          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t('auth_display_name_placeholder')} />
         </label>
       ) : null}
       <label className="field">
-        <span>密码</span>
+        <span>{t('auth_password')}</span>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="至少 6 位"
+          placeholder={t('auth_password_placeholder')}
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
         />
       </label>
       {error ? <p className="form-error">{error}</p> : null}
       <button className="btn accent block" type="submit" disabled={busy}>
         {busy ? <SpinnerIcon size={18} /> : null}
-        <span>{mode === 'login' ? '登录' : '注册并登录'}</span>
+        <span>{mode === 'login' ? t('auth_btn_login') : t('auth_btn_register')}</span>
       </button>
-      <p className="auth-tip">登录后可点赞、评论、关注和发布作品。</p>
+      <p className="auth-tip">{t('auth_tip')}</p>
     </form>
   );
 }

@@ -11,6 +11,8 @@ import { closeComments, toast, useCommentsOpen, useCommentsVideo } from '../stor
 import { navigate } from '../router/router';
 import { formatCount, timeAgo } from '../utils/format';
 
+import { useI18n } from '../store/i18n';
+
 type Props = { video: Video };
 
 function CommentRow({
@@ -24,6 +26,7 @@ function CommentRow({
   onReply: (c: Comment) => void;
   onDelete: (c: Comment) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className={`comment${comment.parent_id ? ' reply' : ''}`}>
       <Avatar user={comment.author} size={34} onClick={() => navigate(`/user/${comment.author.id}`)} />
@@ -34,15 +37,15 @@ function CommentRow({
         </p>
         <p className="comment-text">{comment.content}</p>
         <div className="comment-actions">
-          <span className={`c-like${comment.liked ? ' on' : ''}`} title="点赞数由服务端统计">
+          <span className={`c-like${comment.liked ? ' on' : ''}`}>
             <HeartIcon size={15} on={comment.liked} />
             {comment.likes > 0 ? formatCount(comment.likes) : ''}
           </span>
           <button className="c-act" onClick={() => onReply(comment)}>
-            回复
+            {t('action_reply')}
           </button>
           {me && comment.author.id === me.id ? (
-            <button className="c-act danger" onClick={() => onDelete(comment)} aria-label="删除评论">
+            <button className="c-act danger" onClick={() => onDelete(comment)} aria-label={t('action_delete')}>
               <TrashIcon size={14} />
             </button>
           ) : null}
@@ -55,6 +58,7 @@ function CommentRow({
 /* docs-perf-notes: the drawer only ever translates in X and the list scrolls on its own,
    so opening it costs a compositor move instead of a re-layout of the feed. */
 export function CommentsDrawerBody({ video }: Props) {
+  const { t } = useI18n();
   const me = useSelf();
   /* the prop is a snapshot taken when the drawer opened; the header count has to follow the
      store, otherwise bumpComments moves the rail number and this one stays where it was */
@@ -80,13 +84,13 @@ export function CommentsDrawerBody({ video }: Props) {
       })
       .catch((err: unknown) => {
         if (!alive) return;
-        setError(err instanceof Error ? err.message : '评论加载失败');
+        setError(err instanceof Error ? err.message : t('comments_load_failed'));
         setStatus('error');
       });
     return () => {
       alive = false;
     };
-  }, [video.id]);
+  }, [video.id, t]);
 
   const sorted = useMemo(() => {
     const replies = new Map<string, Comment[]>();
@@ -150,7 +154,7 @@ export function CommentsDrawerBody({ video }: Props) {
       .catch(() => {
         setComments((list) => list.filter((c) => c.id !== temp.id));
         bumpComments(video.id, -1);
-        toast('评论发送失败', 'error');
+        toast(t('comments_send_failed'), 'error');
       })
       .finally(() => setSending(false));
   };
@@ -165,22 +169,22 @@ export function CommentsDrawerBody({ video }: Props) {
       .catch(() => {
         setComments((list) => [...list, c]);
         bumpComments(video.id, 1);
-        toast('删除失败', 'error');
+        toast(t('comments_delete_failed'), 'error');
       });
   };
 
   return (
     <>
       <header className="drawer-head">
-        <h3>{formatCount(live.stats.comments)} 条评论</h3>
-        <button className="icon-btn" onClick={closeComments} aria-label="关闭评论">
+        <h3>{formatCount(live.stats.comments)}{t('comments_count_suffix')}</h3>
+        <button className="icon-btn" onClick={closeComments} aria-label={t('action_cancel')}>
           <CloseIcon size={20} />
         </button>
       </header>
       <div className="comment-list" ref={listRef}>
-        {status === 'loading' ? <Loading label="加载评论" /> : null}
-        {status === 'error' ? <ErrorState text={error ?? '评论加载失败'} /> : null}
-        {status === 'ready' && sorted.length === 0 ? <EmptyState text="还没有评论" hint="发一条，抢个沙发" /> : null}
+        {status === 'loading' ? <Loading label={t('comments_loading')} /> : null}
+        {status === 'error' ? <ErrorState text={error ?? t('comments_load_failed')} /> : null}
+        {status === 'ready' && sorted.length === 0 ? <EmptyState text={t('comments_empty')} hint={t('comments_empty_hint')} /> : null}
         {sorted.map((c) => (
           <CommentRow key={c.id} comment={c} me={me} onReply={(x) => { setReplyTo(x); inputRef.current?.focus(); }} onDelete={remove} />
         ))}
@@ -188,8 +192,8 @@ export function CommentsDrawerBody({ video }: Props) {
       <footer className="drawer-foot">
         {replyTo ? (
           <div className="reply-chip">
-            <span>回复 @{replyTo.author.display_name || replyTo.author.username}</span>
-            <button className="icon-btn tiny" onClick={() => setReplyTo(null)} aria-label="取消回复">
+            <span>{t('comments_reply_to')} @{replyTo.author.display_name || replyTo.author.username}</span>
+            <button className="icon-btn tiny" onClick={() => setReplyTo(null)} aria-label={t('comments_cancel_reply')}>
               <CloseIcon size={14} />
             </button>
           </div>
@@ -199,8 +203,8 @@ export function CommentsDrawerBody({ video }: Props) {
             ref={inputRef}
             rows={1}
             value={text}
-            placeholder="友善评论，理性发言"
-            aria-label="评论内容"
+            placeholder={t('comments_input_placeholder')}
+            aria-label={t('comments_title')}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -209,7 +213,7 @@ export function CommentsDrawerBody({ video }: Props) {
               }
             }}
           />
-          <button className="send-btn" onClick={send} disabled={sending || !text.trim()} aria-label="发送评论">
+          <button className="send-btn" onClick={send} disabled={sending || !text.trim()} aria-label={t('comments_send')}>
             {sending ? <SpinnerIcon size={18} /> : <SendIcon size={19} />}
           </button>
         </div>
@@ -219,6 +223,7 @@ export function CommentsDrawerBody({ video }: Props) {
 }
 
 export function CommentsDrawer() {
+  const { t } = useI18n();
   const commentsOpen = useCommentsOpen();
   const commentsVideo = useCommentsVideo();
   const [retained, setRetained] = useState<Video | null>(commentsVideo);
@@ -240,7 +245,7 @@ export function CommentsDrawer() {
   }, [open]);
 
   return (
-    <section className={`drawer${open ? ' open' : ''}`} aria-hidden={!open} aria-label="评论区">
+    <section className={`drawer${open ? ' open' : ''}`} aria-hidden={!open} aria-label={t('comments_title')}>
       {shown ? <CommentsDrawerBody key={shown.id} video={shown} /> : null}
     </section>
   );

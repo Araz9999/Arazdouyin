@@ -1,5 +1,6 @@
 import { getToken } from '../api/client';
 import type { UploadResult } from '../api/endpoints';
+import { t } from '../store/i18n';
 
 export type VideoMeta = { caption: string; duration: number; width: number; height: number };
 
@@ -27,11 +28,11 @@ export function uploadVideo(
         try {
           resolve(JSON.parse(xhr.responseText) as UploadResult);
         } catch {
-          reject(new Error('上传响应解析失败'));
+          reject(new Error(t('err_upload_parse')));
         }
         return;
       }
-      let msg = `上传失败 (${xhr.status})`;
+      let msg = t('err_request_failed', { status: xhr.status });
       try {
         const body = JSON.parse(xhr.responseText) as { error?: string; message?: string };
         msg = body.error ?? body.message ?? msg;
@@ -40,7 +41,7 @@ export function uploadVideo(
       }
       reject(new Error(msg));
     };
-    xhr.onerror = () => reject(new Error('网络中断，上传失败'));
+    xhr.onerror = () => reject(new Error(t('err_upload_network')));
     xhr.onabort = () => reject(new DOMException('aborted', 'AbortError'));
     if (signal) {
       if (signal.aborted) {
@@ -73,7 +74,7 @@ export function probeVideo(file: File): Promise<Probe> {
     const fail = () => {
       URL.revokeObjectURL(objectUrl);
       el.remove();
-      reject(new Error('无法读取视频文件，请改用 MP4 / WebM'));
+      reject(new Error(t('err_video_unreadable')));
     };
     el.onerror = fail;
     el.onloadedmetadata = () => {

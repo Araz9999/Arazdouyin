@@ -12,6 +12,7 @@ import { EmptyState } from './components/States';
 import { bootstrapAuth, useAuthStatus } from './store/auth';
 import { setSound, useSoundOn } from './store/ui';
 import { videoPool } from './media/videoPool';
+import { useI18n } from './store/i18n';
 
 const FEED_PATHS = new Set(['/', '/follow', '/friends', '/live']);
 
@@ -47,6 +48,7 @@ function BootBridge() {
 }
 
 export default function App() {
+  const { t } = useI18n();
   const route = useRoute();
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export default function App() {
         <TopBar />
         <div className={`page${isFeed ? ' page-feed' : ''}`}>
           <Suspense fallback={<Loading />}>
-            {View && match ? <View key={match.cacheKey} route={route} params={match.params} /> : <EmptyState text="页面不存在" hint="从左侧导航回到推荐" />}
+            {View && match ? <View key={match.cacheKey} route={route} params={match.params} /> : <EmptyState text={t('page_not_found')} hint={t('page_not_found_hint')} />}
           </Suspense>
         </div>
       </div>

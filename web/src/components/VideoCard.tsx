@@ -7,6 +7,7 @@ import { videoPool } from '../media/videoPool';
 import { reportView, toggleLike } from '../store/feed';
 import { Link } from '../router/Link';
 import { formatCount, tagOf, timeAgo } from '../utils/format';
+import { useI18n } from '../store/i18n';
 
 type Props = {
   video: Video;
@@ -26,6 +27,7 @@ function spawnBurst(host: HTMLDivElement | null) {
 }
 
 export const VideoCard = memo(function VideoCard({ video, index, active, registerItem }: Props) {
+  const { t } = useI18n();
   const slotRef = useCallback((el: HTMLElement | null) => videoPool.registerSlot(index, el), [index]);
   const itemRef = useCallback((el: HTMLElement | null) => registerItem(index, el), [index, registerItem]);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -204,7 +206,7 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
           <div className="video-slot" ref={slotRef} />
           <button
             className="tap-layer"
-            aria-label="播放或暂停"
+            aria-label={t('video_play_pause')}
             onClick={() => videoPool.togglePlay()}
             onDoubleClick={() => {
               spawnBurst(burstRef.current);
@@ -230,7 +232,7 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
               className={`caption${clamped && !expanded ? ' clamp' : ''}`}
               onClick={() => (clamped ? setExpanded((v) => !v) : undefined)}
             >
-              {caption || '暂无描述'}
+              {caption || t('no_caption')}
             </p>
             <div className="meta-sub">
               <span className="meta-time">{timeAgo(video.created_at)}</span>
@@ -239,7 +241,7 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
                   #{t}
                 </Link>
               ))}
-              <span className="meta-views">{formatCount(video.stats.views)}播放</span>
+              <span className="meta-views">{formatCount(video.stats.views)}{t('views_suffix')}</span>
             </div>
           </div>
           <div className="scrub" onPointerDown={onScrubStart}>

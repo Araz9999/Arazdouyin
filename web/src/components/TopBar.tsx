@@ -6,7 +6,11 @@ import { SearchIcon, MessageIcon, UploadIcon } from './icons';
 import { requireAuth, useAuthStatus, useSelf } from '../store/auth';
 import { useDebounced } from '../hooks/useDebounced';
 
+import { useI18n } from '../store/i18n';
+import { LangSwitcher } from './LangSwitcher';
+
 export function TopBar() {
+  const { t } = useI18n();
   const route = useRoute();
   const user = useSelf();
   const status = useAuthStatus();
@@ -41,7 +45,7 @@ export function TopBar() {
           id="global-search"
           className="search-input"
           value={text}
-          placeholder="搜索用户、视频和话题"
+          placeholder={t('search_placeholder')}
           onChange={(e) => {
             typed.current = true;
             setText(e.target.value);
@@ -49,25 +53,26 @@ export function TopBar() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit();
           }}
-          aria-label="搜索"
+          aria-label={t('search_label')}
         />
-        <kbd className="hint-chip">Ctrl K</kbd>
+        <kbd className="hint-chip">{t('search_shortcut')}</kbd>
       </div>
       <div className="topbar-right">
+        <LangSwitcher compact />
         <button className="btn accent pill" onClick={() => requireAuth(() => navigate('/upload'))}>
           <UploadIcon size={18} strokeWidth={2.1} />
-          <span>上传</span>
+          <span>{t('nav_upload')}</span>
         </button>
-        <button className="icon-btn" title="消息" aria-label="消息" onClick={() => requireAuth(() => navigate('/messages'))}>
+        <button className="icon-btn" title={t('nav_messages')} aria-label={t('nav_messages')} onClick={() => requireAuth(() => navigate('/messages'))}>
           <MessageIcon size={21} />
         </button>
         {status === 'ready' && user ? (
-          <Link to="/my" className="me-chip" title="我的主页">
+          <Link to="/my" className="me-chip" title={t('my_home')}>
             <Avatar user={user} size={32} />
           </Link>
         ) : (
           <button className="btn outline pill" onClick={() => navigate('/login')}>
-            登录
+            {t('nav_login')}
           </button>
         )}
       </div>

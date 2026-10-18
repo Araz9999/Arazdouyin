@@ -259,3 +259,82 @@
   color: var(--text);
   max-width: 60%;
 }
+
+/* ---------- language switcher ---------- */
+.lang-switcher-compact {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 4px;
+  gap: 2px;
+  user-select: none;
+}
+.lang-switcher-compact .lang-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+.lang-switcher-compact .lang-btn:hover:not(.active) {
+  color: var(--text);
+}
+.lang-switcher-compact .lang-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(254, 44, 85, 0.4);
+}
+.lang-switcher-compact .lang-sep {
+  color: var(--text-3);
+  font-size: 10px;
+  opacity: 0.4;
+}
+
+.lang-switcher {
+  display: flex;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.lang-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.lang-tab:hover:not(.active) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+.lang-tab.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.lang-flag {
+  font-size: 14px;
+  line-height: 1;
+}
+

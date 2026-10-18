@@ -9,9 +9,12 @@ import { toast } from '../store/ui';
 import { SpinnerIcon, UploadIcon } from '../components/icons';
 import { formatDuration } from '../utils/format';
 
+import { useI18n } from '../store/i18n';
+
 const MAX_MB = 200;
 
 export default function UploadPage(_props: RouteProps) {
+  const { t } = useI18n();
   const status = useAuthStatus();
   const [file, setFile] = useState<File | null>(null);
   const [probe, setProbe] = useState<Probe | null>(null);
@@ -34,10 +37,10 @@ export default function UploadPage(_props: RouteProps) {
     return (
       <div className="upload-page">
         <div className="guard-card">
-          <h1>上传作品</h1>
-          <p>登录后即可发布你的第一条短视频。</p>
+          <h1>{t('upload_guard_title')}</h1>
+          <p>{t('upload_guard_desc')}</p>
           <button className="btn accent pill" onClick={() => navigate('/login')}>
-            去登录
+            {t('upload_go_login')}
           </button>
         </div>
       </div>
@@ -47,11 +50,11 @@ export default function UploadPage(_props: RouteProps) {
   const accept = async (picked: File | null) => {
     if (!picked) return;
     if (!picked.type.startsWith('video/')) {
-      setError('请选择视频文件（mp4 / webm）');
+      setError(t('upload_file_invalid'));
       return;
     }
     if (picked.size > MAX_MB * 1024 * 1024) {
-      setError(`文件过大，单文件上限 ${MAX_MB}MB`);
+      setError(t('upload_file_too_large'));
       return;
     }
     setError(null);
@@ -66,7 +69,7 @@ export default function UploadPage(_props: RouteProps) {
       setStage('ready');
     } catch (err) {
       setFile(null);
-      setError(err instanceof Error ? err.message : '读取失败');
+      setError(err instanceof Error ? err.message : t('upload_read_failed'));
     }
   };
 
@@ -93,12 +96,12 @@ export default function UploadPage(_props: RouteProps) {
       const video = normalizeVideo(created.video);
       feedStore.upsertVideo(video);
       setStage('done');
-      toast('发布成功', 'ok');
+      toast(t('publish_success'), 'ok');
       navigate(`/video/${video.id}`);
     } catch (err) {
       setStage('ready');
-      setError(err instanceof Error ? err.message : '发布失败');
-      toast('发布失败', 'error');
+      setError(err instanceof Error ? err.message : t('publish_failed'));
+      toast(t('publish_failed'), 'error');
     }
   };
 
@@ -111,14 +114,14 @@ export default function UploadPage(_props: RouteProps) {
   return (
     <div className="upload-page">
       <div className="page-head">
-        <h1>发布作品</h1>
+        <h1>{t('upload_title')}</h1>
       </div>
       <div className="upload-grid">
         <div
           className={`dropzone${dragging ? ' dragging' : ''}${file ? ' filled' : ''}`}
           role="button"
           tabIndex={0}
-          aria-label="选择视频文件"
+          aria-label={t('upload_drop_title')}
           onDragOver={(e) => {
             e.preventDefault();
             setDragging(true);
@@ -137,8 +140,8 @@ export default function UploadPage(_props: RouteProps) {
           ) : (
             <>
               <UploadIcon size={34} strokeWidth={1.6} />
-              <p>拖拽视频到这里，或点击选择文件</p>
-              <span className="drop-hint">支持 mp4 / webm，单个文件不超过 {MAX_MB}MB</span>
+              <p>{t('upload_drop_title')}</p>
+              <span className="drop-hint">{t('upload_drop_hint')}</span>
             </>
           )}
           <input
@@ -151,30 +154,30 @@ export default function UploadPage(_props: RouteProps) {
         </div>
         <div className="upload-form">
           <label className="field">
-            <span>作品描述</span>
+            <span>{t('upload_caption_label')}</span>
             <textarea
               rows={4}
               value={caption}
               maxLength={200}
-              placeholder="添加作品描述，#话题 更容易被看到"
+              placeholder={t('upload_caption_placeholder')}
               onChange={(e) => setCaption(e.target.value)}
             />
           </label>
           <dl className="meta-list">
             <div>
-              <dt>时长</dt>
+              <dt>{t('upload_meta_duration')}</dt>
               <dd>{probe ? formatDuration(probe.duration) : '—'}</dd>
             </div>
             <div>
-              <dt>分辨率</dt>
+              <dt>{t('upload_meta_resolution')}</dt>
               <dd>{probe ? `${probe.width}×${probe.height}` : '—'}</dd>
             </div>
             <div>
-              <dt>大小</dt>
+              <dt>{t('upload_meta_size')}</dt>
               <dd>{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : '—'}</dd>
             </div>
             <div>
-              <dt>文件名</dt>
+              <dt>{t('upload_meta_filename')}</dt>
               <dd className="ellipsis">{file?.name ?? '—'}</dd>
             </div>
           </dl>
@@ -197,12 +200,12 @@ export default function UploadPage(_props: RouteProps) {
                   setStage('pick');
                 }}
               >
-                重选
+                {t('action_reselect')}
               </button>
             ) : null}
             <button className="btn accent pill" onClick={publish} disabled={!probe || stage === 'uploading'}>
               {stage === 'uploading' ? <SpinnerIcon size={17} /> : null}
-              <span>{stage === 'uploading' ? '上传中' : '发布'}</span>
+              <span>{stage === 'uploading' ? t('action_uploading') : t('action_publish')}</span>
             </button>
           </div>
         </div>

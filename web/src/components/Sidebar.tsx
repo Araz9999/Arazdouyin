@@ -6,12 +6,15 @@ import { BrandMark, FriendIcon, HomeIcon, LiveIcon, MeIcon, FollowIcon } from '.
 import { useAuthStatus, useSelf } from '../store/auth';
 import { readRecents, type RecentUser } from '../utils/recents';
 
-const NAV = [
-  { to: '/', label: '推荐', Icon: HomeIcon },
-  { to: '/follow', label: '关注', Icon: FollowIcon },
-  { to: '/friends', label: '朋友', Icon: FriendIcon },
-  { to: '/my', label: '我的', Icon: MeIcon },
-  { to: '/live', label: '直播', Icon: LiveIcon }
+import { useI18n, type TranslationKey } from '../store/i18n';
+import { LangSwitcher } from './LangSwitcher';
+
+const NAV_KEYS: { to: string; labelKey: TranslationKey; Icon: typeof HomeIcon }[] = [
+  { to: '/', labelKey: 'nav_recommend', Icon: HomeIcon },
+  { to: '/follow', labelKey: 'nav_following', Icon: FollowIcon },
+  { to: '/friends', labelKey: 'nav_friends', Icon: FriendIcon },
+  { to: '/my', labelKey: 'nav_my', Icon: MeIcon },
+  { to: '/live', labelKey: 'nav_live', Icon: LiveIcon }
 ];
 
 function isActive(route: string, to: string) {
@@ -20,6 +23,7 @@ function isActive(route: string, to: string) {
 }
 
 export function Sidebar() {
+  const { t } = useI18n();
   const route = useRoute();
   const user = useSelf();
   const status = useAuthStatus();
@@ -38,20 +42,20 @@ export function Sidebar() {
         <BrandMark size={30} />
         <div className="brand-text">
           <strong>FastVideo</strong>
-          <span>短视频社区</span>
+          <span>{t('brand_sub')}</span>
         </div>
       </div>
       <nav className="nav">
-        {NAV.map(({ to, label, Icon }) => (
+        {NAV_KEYS.map(({ to, labelKey, Icon }) => (
           <Link key={to} to={to} className={`nav-row ${isActive(route.path, to) ? 'active' : ''}`}>
             <Icon size={22} on={isActive(route.path, to)} />
-            <span>{label}</span>
+            <span>{t(labelKey)}</span>
           </Link>
         ))}
       </nav>
       <div className="side-sep" />
       <div className="recent">
-        <p className="side-title">最近登录</p>
+        <p className="side-title">{t('nav_recent_login')}</p>
         {status === 'ready' && user ? (
           <Link to="/my" className="recent-row">
             <Avatar user={user} size={28} />
@@ -60,7 +64,7 @@ export function Sidebar() {
         ) : (
           <Link to="/login" className="recent-row">
             <span className="recent-dot" />
-            <span className="recent-name">登录账号</span>
+            <span className="recent-name">{t('nav_login_account')}</span>
           </Link>
         )}
         {recents.slice(0, 4).map((r) => (
@@ -70,10 +74,13 @@ export function Sidebar() {
           </Link>
         ))}
       </div>
+      <div className="side-lang" style={{ padding: '0 12px 12px' }}>
+        <LangSwitcher />
+      </div>
       <div className="side-foot">
-        <span>Fan club</span>
-        <span>关于</span>
-        <span>帮助</span>
+        <span>{t('nav_fan_club')}</span>
+        <span>{t('nav_about')}</span>
+        <span>{t('nav_help')}</span>
       </div>
     </aside>
   );

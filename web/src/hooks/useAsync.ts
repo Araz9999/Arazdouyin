@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { t } from '../store/i18n';
 
 export type AsyncState<T> = {
   data: T | null;
@@ -33,7 +34,7 @@ export function useAsync<T>(fn: (signal: AbortSignal) => Promise<T>, deps: reado
       })
       .catch((err: unknown) => {
         if (!alive || (err instanceof DOMException && err.name === 'AbortError')) return;
-        setState({ data: null, loading: false, error: err instanceof Error ? err.message : '加载失败' });
+        setState({ data: null, loading: false, error: err instanceof Error ? err.message : t('err_load_failed') });
       });
     return () => {
       alive = false;

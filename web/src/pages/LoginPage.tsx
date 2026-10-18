@@ -4,8 +4,11 @@ import { navigate } from '../router/router';
 import { AuthForm } from '../components/AuthForm';
 import { BrandMark } from '../components/icons';
 import { useAuthStatus } from '../store/auth';
+import { useI18n } from '../store/i18n';
+import { LangSwitcher } from '../components/LangSwitcher';
 
 export default function LoginPage(_props: RouteProps) {
+  const { t } = useI18n();
   const status = useAuthStatus();
 
   useEffect(() => {
@@ -19,12 +22,15 @@ export default function LoginPage(_props: RouteProps) {
           <BrandMark size={40} />
           <div>
             <strong>FastVideo</strong>
-            <span>记录美好的短视频社区</span>
+            <span>{t('brand_slogan')}</span>
           </div>
         </div>
         <AuthForm />
+        <div style={{ marginTop: 16 }}>
+          <LangSwitcher />
+        </div>
       </div>
-      <p className="login-foot">登录状态保存在本机，可随时退出。</p>
+      <p className="login-foot">{t('login_card_foot')}</p>
     </div>
   );
 }

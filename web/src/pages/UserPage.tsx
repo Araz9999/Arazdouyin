@@ -14,10 +14,13 @@ import { requireAuth, updateMe, useSelf } from '../store/auth';
 import { toggleFollow, useIsFollowing } from '../store/feed';
 import { toast } from '../store/ui';
 
+import { useI18n } from '../store/i18n';
+
 type Tab = 'works' | 'likes';
 type Rel = 'followers' | 'following';
 
 function EditPanel({ user, onDone }: { user: User; onDone: (saved: boolean) => void }) {
+  const { t } = useI18n();
   const [name, setName] = useState(user.display_name);
   const [bio, setBio] = useState(user.bio);
   const [color, setColor] = useState(user.avatar_color);
@@ -27,10 +30,10 @@ function EditPanel({ user, onDone }: { user: User; onDone: (saved: boolean) => v
     setBusy(true);
     try {
       await updateMe({ display_name: name.trim() || user.display_name, bio, avatar_color: color });
-      toast('资料已更新', 'ok');
+      toast(t('profile_updated'), 'ok');
       onDone(true);
     } catch (err) {
-      toast(err instanceof Error ? err.message : '保存失败', 'error');
+      toast(err instanceof Error ? err.message : t('op_failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -39,15 +42,15 @@ function EditPanel({ user, onDone }: { user: User; onDone: (saved: boolean) => v
   return (
     <div className="edit-panel">
       <label className="field">
-        <span>昵称</span>
+        <span>{t('user_edit_name')}</span>
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={24} />
       </label>
       <label className="field">
-        <span>简介</span>
-        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} maxLength={120} />
+        <span>{t('user_edit_bio')}</span>
+        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} maxLength={120} placeholder={t('user_edit_bio_placeholder')} />
       </label>
       <label className="field">
-        <span>头像颜色</span>
+        <span>{t('user_edit_color')}</span>
         <div className="swatches">
           {['#fe2c55', '#25f4ee', '#8a5cff', '#ffb400', '#3ce492', '#ff6a3d'].map((c) => (
             <button
@@ -55,17 +58,17 @@ function EditPanel({ user, onDone }: { user: User; onDone: (saved: boolean) => v
               className={`swatch${c === color ? ' on' : ''}`}
               style={{ background: c }}
               onClick={() => setColor(c)}
-              aria-label={`选择颜色 ${c}`}
+              aria-label={`Color ${c}`}
             />
           ))}
         </div>
       </label>
       <div className="row-actions">
         <button className="btn ghost pill" onClick={() => onDone(false)}>
-          取消
+          {t('action_cancel')}
         </button>
         <button className="btn accent pill" onClick={save} disabled={busy}>
-          保存
+          {t('action_save')}
         </button>
       </div>
     </div>
@@ -73,11 +76,12 @@ function EditPanel({ user, onDone }: { user: User; onDone: (saved: boolean) => v
 }
 
 function RelList({ id, rel, onPick }: { id: string; rel: Rel; onPick: (u: User) => void }) {
+  const { t } = useI18n();
   const state = useAsync<User[]>((signal) => userApi.list(id, rel, null, 30, signal).then((r) => r.items ?? []), [id, rel]);
-  if (state.loading) return <Loading label="加载中" />;
+  if (state.loading) return <Loading label={t('state_loading')} />;
   if (state.error) return <ErrorState text={state.error} />;
   const items = state.data ?? [];
-  if (!items.length) return <EmptyState text={rel === 'followers' ? '还没有粉丝' : '还没有关注任何人'} />;
+  if (!items.length) return <EmptyState text={rel === 'followers' ? t('user_no_followers') : t('user_no_following')} />;
   return (
     <div className="rel-list">
       {items.map((u) => (
@@ -88,6 +92,7 @@ function RelList({ id, rel, onPick }: { id: string; rel: Rel; onPick: (u: User) 
 }
 
 export default function UserPage({ params }: RouteProps) {
+  const { t } = useI18n();
   const me = useSelf();
   const requested = params.id === 'me' ? me?.id : params.id;
   const id = requested ?? '';
@@ -156,7 +161,7 @@ export default function UserPage({ params }: RouteProps) {
         setNext(page.nextCursor);
       })
       .catch(() => {
-        if (!ctrl.signal.aborted) toast('加载更多失败', 'error');
+        if (!ctrl.signal.aborted) toast(t('op_failed'), 'error');
       })
       .finally(() => setMoreBusy(false));
   };
@@ -165,17 +170,17 @@ export default function UserPage({ params }: RouteProps) {
   const stats = profile.data?.stats;
   const isSelf = !!user && !!me && user.id === me.id;
 
-  if (!id) return <EmptyState text="请先登录" action={<button className="btn accent pill" onClick={() => navigate('/login')}>去登录</button>} />;
-  if (profile.loading && !user) return <Loading label="加载主页" />;
+  if (!id) return <EmptyState text={t('auth_sheet_title')} action={<button className="btn accent pill" onClick={() => navigate('/login')}>{t('nav_login')}</button>} />;
+  if (profile.loading && !user) return <Loading label={t('state_loading')} />;
   if (profile.error && !user) return <ErrorState text={profile.error} onRetry={profile.reload} />;
-  if (!user) return <ErrorState text="用户不存在" />;
+  if (!user) return <ErrorState text={t('user_not_found')} />;
 
   const items = [...(listState.data?.items ?? []), ...extra];
 
   return (
     <div className="user-page">
       <div className="cover" style={{ background: `linear-gradient(120deg, ${user.avatar_color}55, #17171c 60%)` }}>
-        <span className="cover-label">作品封面</span>
+        <span className="cover-label">{t('user_tab_works')}</span>
       </div>
       <div className="profile">
         <Avatar user={user} size={84} className="profile-avatar" />
@@ -185,25 +190,25 @@ export default function UserPage({ params }: RouteProps) {
             {user.verified ? <VerifiedIcon size={16} /> : null}
           </h1>
           <p className="profile-id">
-            抖音号：{user.username}
+            @{user.username}
             {user.bio ? <span className="profile-bio"> · {user.bio}</span> : null}
           </p>
           <div className="profile-stats">
             <button className="stat" onClick={() => setRel('following')}>
               <strong>{formatCount(stats?.following ?? user.following_count)}</strong>
-              <span>关注</span>
+              <span>{t('user_stat_following')}</span>
             </button>
             <button className="stat" onClick={() => setRel('followers')}>
               <strong>{formatCount(stats?.followers ?? user.follower_count)}</strong>
-              <span>粉丝</span>
+              <span>{t('user_stat_followers')}</span>
             </button>
             <span className="stat">
               <strong>{formatCount(stats?.likes_received ?? 0)}</strong>
-              <span>获赞</span>
+              <span>{t('user_stat_likes')}</span>
             </span>
             <span className="stat">
               <strong>{formatCount(stats?.videos ?? items.length)}</strong>
-              <span>作品</span>
+              <span>{t('user_tab_works')}</span>
             </span>
           </div>
         </div>
@@ -211,7 +216,7 @@ export default function UserPage({ params }: RouteProps) {
           {isSelf ? (
             <button className="btn ghost pill" onClick={() => setEditing((v) => !v)}>
               <EditIcon size={16} />
-              <span>编辑资料</span>
+              <span>{t('user_edit_profile')}</span>
             </button>
           ) : (
             <>
@@ -219,13 +224,13 @@ export default function UserPage({ params }: RouteProps) {
                 className={`btn pill ${following ? 'ghost' : 'accent'}`}
                 onClick={() => requireAuth(() => toggleFollow(user.id))}
               >
-                {following ? '已关注' : '+ 关注'}
+                {following ? t('action_following') : `+ ${t('action_follow')}`}
               </button>
               <button
                 className="btn outline pill"
                 onClick={() => requireAuth(() => navigate(`/messages/${user.id}`))}
               >
-                私信
+                {t('user_message_btn')}
               </button>
             </>
           )}
@@ -235,9 +240,6 @@ export default function UserPage({ params }: RouteProps) {
             user={user}
             onDone={(saved) => {
               setEditing(false);
-              /* docs-perf-notes: updateMe only drops the GET cache for /users/, which a mounted
-                 useAsync never re-reads because its [id] deps are unchanged — without this
-                 reload the header keeps the old nickname and bio until a manual refresh. */
               if (saved) profile.reload();
             }}
           />
@@ -246,9 +248,9 @@ export default function UserPage({ params }: RouteProps) {
       {rel ? (
         <div className="rel-panel">
           <div className="rel-head">
-            <h2>{rel === 'followers' ? '粉丝' : '关注'}</h2>
+            <h2>{rel === 'followers' ? t('user_stat_followers') : t('user_stat_following')}</h2>
             <button className="btn ghost pill small" onClick={() => setRel(null)}>
-              收起
+              {t('action_cancel')}
             </button>
           </div>
           <RelList id={user.id} rel={rel} onPick={(u) => navigate(`/user/${u.id}`)} />
@@ -256,23 +258,23 @@ export default function UserPage({ params }: RouteProps) {
       ) : null}
       <div className="tabs">
         <button className={`tab-btn${tab === 'works' ? ' on' : ''}`} onClick={() => setTab('works')}>
-          作品
+          {t('user_tab_works')}
         </button>
         <button className={`tab-btn${tab === 'likes' ? ' on' : ''}`} onClick={() => setTab('likes')}>
-          喜欢
+          {t('user_tab_likes')}
         </button>
       </div>
-      {listState.loading && !items.length ? <Loading label="加载作品" /> : null}
+      {listState.loading && !items.length ? <Loading label={t('state_loading')} /> : null}
       {listState.error && !items.length ? <ErrorState text={listState.error} onRetry={listState.reload} /> : null}
       {!listState.loading && !items.length ? (
-        <EmptyState text={tab === 'works' ? '还没有发布作品' : '还没有喜欢的视频'} />
+        <EmptyState text={tab === 'works' ? t('user_no_works') : t('user_no_likes')} />
       ) : null}
       {items.length ? (
         <>
           <ThumbGrid items={items} />
           {next ? (
             <button className="btn ghost block" onClick={loadMore} disabled={moreBusy}>
-              {moreBusy ? '加载中…' : '加载更多'}
+              {moreBusy ? t('state_loading') : t('search_load_more')}
             </button>
           ) : null}
         </>

@@ -1,4 +1,5 @@
 import { store } from '../utils/storage';
+import { t } from '../store/i18n';
 
 export class ApiError extends Error {
   status: number;
@@ -65,7 +66,7 @@ async function jsonOf(res: Response, strict = true): Promise<Json> {
     /* docs-perf-notes: a 200 that is not JSON (an SPA fallback page, a proxy error) must
        surface as an error state instead of silently looking like "zero videos". */
     if (!strict) return null;
-    throw new ApiError(res.status, '服务返回了无法解析的内容', 'bad_json');
+    throw new ApiError(res.status, t('err_bad_json'), 'bad_json');
   }
 }
 
@@ -81,11 +82,11 @@ export async function rawFetch(path: string, init: RequestInit): Promise<Respons
     res = await fetch(apiUrl(path), init);
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err;
-    throw new ApiError(0, '网络异常，请检查连接', 'network');
+    throw new ApiError(0, t('err_network'), 'network');
   }
   if (!res.ok) {
     const body = (await jsonOf(res, false)) as { error?: string; message?: string; code?: string } | null;
-    throw new ApiError(res.status, body?.error ?? body?.message ?? `请求失败 (${res.status})`, body?.code ?? 'error');
+    throw new ApiError(res.status, body?.error ?? body?.message ?? t('err_request_failed', { status: res.status }), body?.code ?? 'error');
   }
   return res;
 }
