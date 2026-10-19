@@ -20,10 +20,15 @@ class VideoPool {
   private warm: AbortController | null = null;
   private warmUrl = '';
   private warmDone = '';
+  private nearEndWarm: AbortController | null = null;
+  private nearEndUrl = '';
+  private nearEndPreloadedFor = -1;
   private blocked = false;
   private syncers = new Set<() => void>();
   muted = true;
+  playbackRate = 1;
   onSoundChange: ((muted: boolean) => void) | null = null;
+  onSpeedChange: ((rate: number) => void) | null = null;
 
   onSync(cb: () => void): () => void {
     this.syncers.add(cb);
@@ -133,6 +138,7 @@ class VideoPool {
     const host = this.slots.get(item.index);
     if (host && el.parentElement !== host) host.appendChild(el);
     el.muted = this.muted;
+    el.playbackRate = this.playbackRate;
     if (same) {
       /* roles rotate with no network work: a slot promoted to active keeps every byte it has
          already buffered (re-assigning src + load() would drop the buffer and refetch from 0),
@@ -192,6 +198,9 @@ class VideoPool {
     this.warm?.abort();
     this.warm = null;
     this.warmUrl = '';
+    this.nearEndWarm?.abort();
+    this.nearEndWarm = null;
+    this.nearEndUrl = '';
   }
 
   private warmUp(url: string) {
@@ -255,6 +264,22 @@ class VideoPool {
     }
   }
 
+  setPlaybackRate(rate: number) {
+    this.playbackRate = rate;
+    for (const el of this.els) {
+      el.playbackRate = rate;
+    }
+    this.onSpeedChange?.(rate);
+  }
+
+  cyclePlaybackRate(): number {
+    const rates = [1, 1.25, 1.5, 2];
+    const curIdx = rates.indexOf(this.playbackRate);
+    const nextRate = rates[(curIdx + 1) % rates.length];
+    this.setPlaybackRate(nextRate);
+    return nextRate;
+  }
+
   togglePlay() {
     const el = this.activeElement();
     if (!el) return;
@@ -274,6 +299,78 @@ class VideoPool {
     const el = this.activeElement();
     if (!el || !Number.isFinite(el.duration) || el.duration <= 0) return;
     el.currentTime = Math.min(0.999, Math.max(0, ratio)) * el.duration;
+  }
+
+  seekBySeconds(delta: number) {
+    const el = this.activeElement();
+    if (!el || !Number.isFinite(el.duration) || el.duration <= 0) return;
+    const target = Math.min(Math.max(0, el.currentTime + delta), Math.max(0, el.duration - 0.1));
+    el.currentTime = target;
+  }
+
+  preloadNextVideo(currentIndex?: number) {
+    const activeIdx = currentIndex ?? this.activeIndex();
+    if (activeIdx < 0 || this.nearEndPreloadedFor === activeIdx) return;
+    this.nearEndPreloadedFor = activeIdx;
+
+    const nextSlot = this.binds.findIndex((b) => b?.role === 'next');
+    if (nextSlot < 0) return;
+
+    const nextEl = this.els[nextSlot];
+    const nextBind = this.binds[nextSlot];
+    if (!nextEl || !nextBind) return;
+
+    /* docs-perf-notes: when nearing the end of current video, upgrade next video
+       preload to 'auto' to prime the media buffer, and proactively buffer the next
+       chunk so transition to the next video in the feed is instant and stutter-free. */
+    if (nextEl.preload !== 'auto') {
+      nextEl.preload = 'auto';
+    }
+
+    this.warmUpNearEnd(nextBind.url);
+  }
+
+  private warmUpNearEnd(url: string) {
+    if (!url || url === this.nearEndUrl) return;
+    this.nearEndWarm?.abort();
+    const ctrl = new AbortController();
+    this.nearEndWarm = ctrl;
+    this.nearEndUrl = url;
+
+    void fetch(url, {
+      signal: ctrl.signal,
+      credentials: 'same-origin'
+    })
+      .then((res) => this.drainLimit(res, 3 * 1024 * 1024))
+      .then(() => {
+        if (this.nearEndWarm !== ctrl) return;
+        this.nearEndWarm = null;
+      })
+      .catch(() => {
+        if (this.nearEndWarm === ctrl) {
+          this.nearEndWarm = null;
+          this.nearEndUrl = '';
+        }
+      });
+  }
+
+  private async drainLimit(res: Response, limit: number): Promise<void> {
+    if (!res.ok) return;
+    if (!res.body) {
+      await res.arrayBuffer();
+      return;
+    }
+    const reader = res.body.getReader();
+    let got = 0;
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      got += chunk.value?.byteLength ?? 0;
+      if (got >= limit) {
+        await reader.cancel();
+        break;
+      }
+    }
   }
 }
 

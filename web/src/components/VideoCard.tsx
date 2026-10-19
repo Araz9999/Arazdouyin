@@ -6,7 +6,7 @@ import { VerifiedIcon } from './icons';
 import { videoPool } from '../media/videoPool';
 import { reportView, toggleLike } from '../store/feed';
 import { Link } from '../router/Link';
-import { formatCount, tagOf, timeAgo } from '../utils/format';
+import { formatCount, formatDuration, tagOf, timeAgo } from '../utils/format';
 import { useI18n } from '../store/i18n';
 
 type Props = {
@@ -14,6 +14,7 @@ type Props = {
   index: number;
   active: boolean;
   registerItem: (index: number, el: HTMLElement | null) => void;
+  onNearEnd?: (index: number) => void;
 };
 
 function spawnBurst(host: HTMLDivElement | null) {
@@ -26,7 +27,7 @@ function spawnBurst(host: HTMLDivElement | null) {
   node.addEventListener('animationend', () => node.remove(), { once: true });
 }
 
-export const VideoCard = memo(function VideoCard({ video, index, active, registerItem }: Props) {
+export const VideoCard = memo(function VideoCard({ video, index, active, registerItem, onNearEnd }: Props) {
   const { t } = useI18n();
   const slotRef = useCallback((el: HTMLElement | null) => videoPool.registerSlot(index, el), [index]);
   const itemRef = useCallback((el: HTMLElement | null) => registerItem(index, el), [index, registerItem]);
@@ -38,6 +39,17 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
   const captionRef = useRef<HTMLParagraphElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [clamped, setClamped] = useState(false);
+  const [speed, setSpeed] = useState(videoPool.playbackRate);
+
+  useEffect(() => {
+    if (!active) return;
+    setSpeed(videoPool.playbackRate);
+    const prev = videoPool.onSpeedChange;
+    videoPool.onSpeedChange = (rate) => setSpeed(rate);
+    return () => {
+      if (videoPool.onSpeedChange === prev) videoPool.onSpeedChange = null;
+    };
+  }, [active]);
 
   const author = video.author;
   const caption = video.caption.trim();
@@ -70,6 +82,9 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
     setClamped(Number.isFinite(lineHeight) ? natural > lineHeight * 2 + 2 : natural > 44);
   }, [caption]);
 
+  const onNearEndRef = useRef(onNearEnd);
+  onNearEndRef.current = onNearEnd;
+
   /* docs-perf-notes: the progress bar is driven from a rAF loop that writes one transform
      and one text node directly. Routing timeupdate through React state would re-render the
      card ~4x/sec and keep the main thread busy during the swipe.
@@ -83,6 +98,7 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
     let el: HTMLVideoElement | null = null;
     let lastRatio = -1;
     let lastText = '';
+    let nearEndTriggered = false;
 
     const write = () => {
       if (!el) return;
@@ -94,11 +110,25 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
         fillRef.current.style.transform = `scaleX(${ratio})`;
       }
       if (timeRef.current) {
-        const text = `${el.currentTime.toFixed(1)}s / ${dur.toFixed(0)}s`;
+        const text = `${formatDuration(el.currentTime)} / ${formatDuration(dur)}`;
         if (text !== lastText) {
           lastText = text;
           timeRef.current.textContent = text;
         }
+      }
+
+      /* docs-perf-notes: video preloading strategy — when the user is nearing the end
+         of the current clip (remaining <= 4.5s or ratio >= 0.70), fetch and buffer
+         the next video in the feed so playback continues seamlessly with 0ms buffering. */
+      const remaining = dur - el.currentTime;
+      if (ratio >= 0.7 || remaining <= 4.5) {
+        if (!nearEndTriggered) {
+          nearEndTriggered = true;
+          videoPool.preloadNextVideo(index);
+          onNearEndRef.current?.(index);
+        }
+      } else if (ratio < 0.4) {
+        nearEndTriggered = false;
       }
     };
 
@@ -133,6 +163,7 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
       target.removeEventListener('pause', onState);
       target.removeEventListener('play', onState);
       target.removeEventListener('loadeddata', onFrame);
+      target.removeEventListener('timeupdate', write);
     };
 
     const attach = () => {
@@ -150,7 +181,9 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
       el.addEventListener('pause', onState, { passive: true });
       el.addEventListener('play', onState, { passive: true });
       el.addEventListener('loadeddata', onFrame, { passive: true });
+      el.addEventListener('timeupdate', write, { passive: true });
       onState();
+      write();
       if (el.readyState >= 2) onFrame();
     };
 
@@ -167,6 +200,7 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
   const onScrubStart = (e: PointerEvent<HTMLDivElement>) => {
     if (!active) return;
     const track = e.currentTarget;
+    track.classList.add('scrubbing');
     const rect = track.getBoundingClientRect();
     const el = videoPool.elementFor(index);
     if (!el || !Number.isFinite(el.duration) || el.duration <= 0) return;
@@ -177,6 +211,7 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
       if (fillRef.current) fillRef.current.style.transform = `scaleX(${ratio})`;
     };
     const end = () => {
+      track.classList.remove('scrubbing');
       track.removeEventListener('pointermove', move);
       track.removeEventListener('pointerup', end);
       track.removeEventListener('pointercancel', end);
@@ -235,6 +270,12 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
               {caption || t('no_caption')}
             </p>
             <div className="meta-sub">
+              {video.duration > 0 ? (
+                <span className={`meta-duration${video.duration >= 60 ? ' long' : ''}`} title={t('video_duration_label')}>
+                  ⏱ {formatDuration(video.duration)}
+                  {video.duration >= 600 ? <span className="long-tag-text">{t('tag_long_video')}</span> : null}
+                </span>
+              ) : null}
               <span className="meta-time">{timeAgo(video.created_at)}</span>
               {tags.map((t) => (
                 <Link key={t} to={`/search?q=${encodeURIComponent(`#${t}`)}`} className="tag">
@@ -244,6 +285,20 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
               <span className="meta-views">{formatCount(video.stats.views)}{t('views_suffix')}</span>
             </div>
           </div>
+          {active ? (
+            <button
+              className="card-speed-btn"
+              title={`${t('action_speed')}: ${speed}x`}
+              aria-label={`${t('action_speed')}: ${speed}x`}
+              onClick={(e) => {
+                e.stopPropagation();
+                const nextRate = videoPool.cyclePlaybackRate();
+                setSpeed(nextRate);
+              }}
+            >
+              {speed}x
+            </button>
+          ) : null}
           <div className="scrub" onPointerDown={onScrubStart}>
             <div className="scrub-fill" ref={fillRef} />
           </div>

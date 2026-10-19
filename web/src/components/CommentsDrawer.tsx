@@ -90,7 +90,7 @@ export function CommentsDrawerBody({ video }: Props) {
     return () => {
       alive = false;
     };
-  }, [video.id, t]);
+  }, [video.id]);
 
   const sorted = useMemo(() => {
     const replies = new Map<string, Comment[]>();

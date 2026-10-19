@@ -10,9 +10,10 @@ import {
 } from 'react';
 import type { Video } from '../api/types';
 import type { FeedKind } from '../store/feed';
-import { loadMoreFeed } from '../store/feed';
+import { loadMoreFeed, toggleLike } from '../store/feed';
 import { videoPool, type SlotPlan } from '../media/videoPool';
-import { setSound, uiStore } from '../store/ui';
+import { closeComments, openComments, setSound, toast, uiStore } from '../store/ui';
+import { useI18n } from '../store/i18n';
 import { VideoCard } from './VideoCard';
 
 const WINDOW = 3;
@@ -23,9 +24,10 @@ type Props = {
   kind: FeedKind;
   items: Video[];
   empty?: ReactNode;
+  onOpenShortcuts?: () => void;
 };
 
-export const FeedScroller = memo(function FeedScroller({ feedKey, kind, items, empty }: Props) {
+export const FeedScroller = memo(function FeedScroller({ feedKey, kind, items, empty, onOpenShortcuts }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const ioRef = useRef<IntersectionObserver | null>(null);
   const itemEls = useRef(new Map<number, HTMLElement>());
@@ -129,17 +131,21 @@ export const FeedScroller = memo(function FeedScroller({ feedKey, kind, items, e
 
   /* the keyboard handler reads live values from a ref, so window carries exactly one
      listener for the life of the feed instead of a remove/add pair on every swipe */
-  const navRef = useRef({ active, count, cardH });
+  const navRef = useRef({ active, count, cardH, items });
   useLayoutEffect(() => {
-    navRef.current = { active, count, cardH };
+    navRef.current = { active, count, cardH, items };
   });
 
+  const { t } = useI18n();
+
   const goTo = useCallback((index: number) => {
-    const { count: total, cardH: h } = navRef.current;
+    const { count: total } = navRef.current;
+    if (total <= 0) return;
     const clamped = Math.min(Math.max(index, 0), Math.max(0, total - 1));
     setActive(clamped);
     const root = scrollerRef.current;
     if (!root) return;
+    const h = root.clientHeight || navRef.current.cardH || window.innerHeight;
     const el = root.querySelector<HTMLElement>(`.feed-item[data-index="${clamped}"]`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     else root.scrollTo({ top: clamped * h, behavior: 'smooth' });
@@ -147,40 +153,135 @@ export const FeedScroller = memo(function FeedScroller({ feedKey, kind, items, e
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          target.closest('input, textarea, [contenteditable="true"]'))
+      ) {
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      /* space activates the focused control; stealing it would break every rail / tab button
-         and the app-wide Ctrl-K shortcut reads as a plain "k" otherwise.
-         a keydown can target document/window, which has no closest() to call */
-      const onControl = !!(t && typeof t.closest === 'function' && t.closest('button, a, [role="button"]'));
-      if (e.code === 'Space' && onControl) return;
-      if (e.key === 'ArrowDown' || e.key === 'j') {
+
+      const { active: curActive, items: curItems } = navRef.current;
+      const currentVideo = curItems[curActive];
+
+      // Spacebar or K toggles play/pause
+      if (e.code === 'Space' || e.key === ' ' || e.key === 'k' || e.key === 'K') {
         e.preventDefault();
-        goTo(navRef.current.active + 1);
-      } else if (e.key === 'ArrowUp' || e.key === 'k') {
-        e.preventDefault();
-        goTo(navRef.current.active - 1);
-      } else if (e.code === 'Space') {
-        e.preventDefault();
+        if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+          document.activeElement.blur();
+        }
         videoPool.togglePlay();
-      } else if (e.key === 'm') {
-        setSound(!uiStore.get().soundOn);
+        return;
+      }
+
+      // Arrow Down, PageDown, or J for Next Video
+      if (e.key === 'ArrowDown' || e.key === 'j' || e.key === 'J' || e.key === 'PageDown') {
+        e.preventDefault();
+        goTo(curActive + 1);
+        return;
+      }
+
+      // Arrow Up or PageUp for Previous Video
+      if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault();
+        goTo(curActive - 1);
+        return;
+      }
+
+      // Arrow Right: Seek forward 5s
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        videoPool.seekBySeconds(5);
+        toast(t('seek_forward_toast'), 'info');
+        return;
+      }
+
+      // Arrow Left: Seek backward 5s
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        videoPool.seekBySeconds(-5);
+        toast(t('seek_backward_toast'), 'info');
+        return;
+      }
+
+      // M: Toggle mute/sound
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        const nextSound = !uiStore.get().soundOn;
+        setSound(nextSound);
+        toast(nextSound ? t('action_sound_on') : t('action_sound_off'), 'info');
+        return;
+      }
+
+      // L: Like/unlike active video
+      if ((e.key === 'l' || e.key === 'L') && currentVideo) {
+        e.preventDefault();
+        toggleLike(currentVideo);
+        return;
+      }
+
+      // C: Toggle comments
+      if ((e.key === 'c' || e.key === 'C') && currentVideo) {
+        e.preventDefault();
+        if (uiStore.get().commentsOpen) {
+          closeComments();
+        } else {
+          openComments(currentVideo);
+        }
+        return;
+      }
+
+      // S or >: Cycle playback speed (1x, 1.25x, 1.5x, 2x)
+      if (e.key === 's' || e.key === 'S' || e.key === '>' || e.key === '<') {
+        e.preventDefault();
+        const nextRate = videoPool.cyclePlaybackRate();
+        toast(`${nextRate}x ${t('action_speed')}`, 'info');
+        return;
+      }
+
+      // ?: Open keyboard shortcuts help
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        onOpenShortcuts?.();
+        return;
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goTo]);
+  }, [goTo, onOpenShortcuts, t]);
+
+  const onNearEnd = useCallback(
+    (index: number) => {
+      videoPool.preloadNextVideo(index);
+      if (index >= count - 2) {
+        loadMoreFeed(feedKey, kind);
+      }
+    },
+    [count, feedKey, kind]
+  );
 
   const cards = useMemo(() => {
     const out: ReactNode[] = [];
     for (let i = start; i <= end; i++) {
       const video = items[i];
       if (!video) continue;
-      out.push(<VideoCard key={video.id} video={video} index={i} active={i === active} registerItem={registerItem} />);
+      out.push(
+        <VideoCard
+          key={video.id}
+          video={video}
+          index={i}
+          active={i === active}
+          registerItem={registerItem}
+          onNearEnd={onNearEnd}
+        />
+      );
     }
     return out;
-  }, [start, end, active, items, registerItem]);
+  }, [start, end, active, items, registerItem, onNearEnd]);
 
   return (
     <div className="feed-scroll" ref={scrollerRef} data-feed={feedKey}>

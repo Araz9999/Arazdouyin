@@ -142,6 +142,7 @@ export default function UploadPage(_props: RouteProps) {
               <UploadIcon size={34} strokeWidth={1.6} />
               <p>{t('upload_drop_title')}</p>
               <span className="drop-hint">{t('upload_drop_hint')}</span>
+              <span className="drop-length-info">{t('upload_length_info')}</span>
             </>
           )}
           <input
@@ -166,7 +167,18 @@ export default function UploadPage(_props: RouteProps) {
           <dl className="meta-list">
             <div>
               <dt>{t('upload_meta_duration')}</dt>
-              <dd>{probe ? formatDuration(probe.duration) : '—'}</dd>
+              <dd>
+                {probe ? (
+                  <>
+                    <span>{formatDuration(probe.duration)}</span>
+                    {probe.duration >= 60 ? (
+                      <span className="upload-duration-pill"> ({t('tag_long_video')})</span>
+                    ) : null}
+                  </>
+                ) : (
+                  '—'
+                )}
+              </dd>
             </div>
             <div>
               <dt>{t('upload_meta_resolution')}</dt>

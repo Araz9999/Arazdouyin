@@ -16,7 +16,7 @@ export function ThumbGrid({ items }: { items: Video[] }) {
             <PlayIcon size={13} />
             {formatCount(v.stats.views)}
           </span>
-          <span className="thumb-dur">{formatDuration(v.duration)}</span>
+          <span className={`thumb-dur${v.duration >= 60 ? ' long' : ''}`}>{formatDuration(v.duration)}</span>
           <span className="thumb-cap">{v.caption || t('no_caption')}</span>
         </button>
       ))}

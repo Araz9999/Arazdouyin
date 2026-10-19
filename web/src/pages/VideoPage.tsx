@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { RouteProps } from '../router/router';
 import { Link } from '../router/Link';
 import { navigate } from '../router/router';
@@ -11,7 +11,7 @@ import { ActionRail } from '../components/ActionRail';
 import { CommentsDrawerBody } from '../components/CommentsDrawer';
 import { BackIcon, VerifiedIcon } from '../components/icons';
 import { feedStore, reportView, useVideo } from '../store/feed';
-import { formatCount, formatDate, tagOf } from '../utils/format';
+import { formatCount, formatDate, formatDuration, tagOf } from '../utils/format';
 import { useSoundOn } from '../store/ui';
 
 import { useI18n } from '../store/i18n';
@@ -23,6 +23,7 @@ export default function VideoPage({ params }: RouteProps) {
   const stored = useVideo(id);
   const video = stored ?? state.data ?? null;
   const soundOn = useSoundOn();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (state.data) feedStore.upsertVideo(state.data);
@@ -31,6 +32,60 @@ export default function VideoPage({ params }: RouteProps) {
   useEffect(() => {
     if (video) reportView(video.id);
   }, [video?.id]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          target.closest('input, textarea, [contenteditable="true"]'))
+      ) {
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const vid = videoRef.current;
+      if (!vid) return;
+
+      if (e.code === 'Space' || e.key === ' ' || e.key === 'k' || e.key === 'K') {
+        e.preventDefault();
+        if (vid.paused) void vid.play().catch(() => undefined);
+        else vid.pause();
+        return;
+      }
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        vid.currentTime = Math.min(vid.duration || 0, vid.currentTime + 5);
+        return;
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        vid.currentTime = Math.max(0, vid.currentTime - 5);
+        return;
+      }
+
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        vid.muted = !vid.muted;
+        return;
+      }
+
+      if (e.key === 's' || e.key === 'S' || e.key === '>') {
+        e.preventDefault();
+        const rates = [1, 1.25, 1.5, 2];
+        const curIdx = rates.indexOf(vid.playbackRate);
+        vid.playbackRate = rates[(curIdx + 1) % rates.length];
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const tags = useMemo(() => (video ? tagOf(video.caption) : []), [video]);
 
@@ -52,6 +107,7 @@ export default function VideoPage({ params }: RouteProps) {
         <div className="vp-left">
           <div className="vp-player">
             <video
+              ref={videoRef}
               src={video.url}
               poster={video.poster || undefined}
               controls
@@ -80,6 +136,11 @@ export default function VideoPage({ params }: RouteProps) {
               </div>
             ) : null}
             <p className="vp-meta">
+              {video.duration > 0 ? (
+                <span className={`meta-duration${video.duration >= 60 ? ' long' : ''}`}>
+                  ⏱ {formatDuration(video.duration)}
+                </span>
+              ) : null}
               <span>{formatDate(video.created_at)}</span>
               <span>{formatCount(video.stats.views)}{t('views_suffix')}</span>
               <span>{formatCount(video.stats.shares)}{t('shares_suffix')}</span>

@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { createStore, useStore } from './reactive';
 
 export type Lang = 'tr' | 'ru';
@@ -195,6 +196,38 @@ export const translations = {
     err_video_unreadable: 'Video dosyası okunamadı (lütfen MP4 veya WebM kullanın)',
     err_load_failed: 'Yükleme başarısız',
     video_play_pause: 'Oynat veya Duraklat',
+
+    // Keyboard Shortcuts
+    shortcuts_title: 'Klavye Kısayolları',
+    shortcuts_desc: 'Hızlı gezinme ve oynatma kontrolü için kısayolları kullanın',
+    shortcut_play_pause: 'Oynat / Duraklat',
+    shortcut_play_pause_key: 'Boşluk veya K',
+    shortcut_next_video: 'Sonraki Video',
+    shortcut_next_video_key: 'Aşağı Ok / J',
+    shortcut_prev_video: 'Önceki Video',
+    shortcut_prev_video_key: 'Yukarı Ok',
+    shortcut_seek_forward: '5 sn İleri Sar',
+    shortcut_seek_forward_key: 'Sağ Ok',
+    shortcut_seek_backward: '5 sn Geri Sar',
+    shortcut_seek_backward_key: 'Sol Ok',
+    shortcut_sound: 'Sesi Aç / Kapat',
+    shortcut_sound_key: 'M',
+    shortcut_like: 'Beğen / Beğeniyi Kaldır',
+    shortcut_like_key: 'L',
+    shortcut_comments: 'Yorumları Aç / Kapat',
+    shortcut_comments_key: 'C',
+    shortcut_search: 'Arama Yap',
+    shortcut_search_key: 'Ctrl + K',
+    shortcut_help: 'Kısayolları Göster',
+    shortcut_help_key: '?',
+    shortcut_close: 'Kapat',
+    action_speed: 'Hız',
+    shortcut_speed: 'Oynatma Hızı (1x / 1.5x / 2x)',
+    video_duration_label: 'Süre',
+    tag_long_video: 'Uzun Video',
+    upload_length_info: '15 saniyeden 15 dakikaya veya daha uzun videolara kadar desteklenir',
+    seek_forward_toast: '+5 sn',
+    seek_backward_toast: '-5 sn',
   },
   ru: {
     // Brand & Slogan
@@ -386,6 +419,38 @@ export const translations = {
     err_video_unreadable: 'Не удалось прочитать видеофайл (используйте MP4 или WebM)',
     err_load_failed: 'Ошибка загрузки',
     video_play_pause: 'Воспроизведение или пауза',
+
+    // Keyboard Shortcuts
+    shortcuts_title: 'Горячие клавиши',
+    shortcuts_desc: 'Используйте клавиши для быстрого управления видео и навигации',
+    shortcut_play_pause: 'Воспроизведение / Пауза',
+    shortcut_play_pause_key: 'Пробел или K',
+    shortcut_next_video: 'Следующее видео',
+    shortcut_next_video_key: 'Стрелка вниз / J',
+    shortcut_prev_video: 'Предыдущее видео',
+    shortcut_prev_video_key: 'Стрелка вверх',
+    shortcut_seek_forward: 'Перемотка вперед (5 сек)',
+    shortcut_seek_forward_key: 'Стрелка вправо',
+    shortcut_seek_backward: 'Перемотка назад (5 сек)',
+    shortcut_seek_backward_key: 'Стрелка влево',
+    shortcut_sound: 'Звук вкл / выкл',
+    shortcut_sound_key: 'M',
+    shortcut_like: 'Нравится / Убрать лайк',
+    shortcut_like_key: 'L',
+    shortcut_comments: 'Комментарии',
+    shortcut_comments_key: 'C',
+    shortcut_search: 'Поиск',
+    shortcut_search_key: 'Ctrl + K',
+    shortcut_help: 'Список горячих клавиш',
+    shortcut_help_key: '?',
+    shortcut_close: 'Закрыть',
+    action_speed: 'Скорость',
+    shortcut_speed: 'Скорость воспроизведения (1x / 1.5x / 2x)',
+    video_duration_label: 'Длительность',
+    tag_long_video: 'Длинное видео',
+    upload_length_info: 'Поддерживаются видео от 15 секунд до 15 минут и дольше',
+    seek_forward_toast: '+5 сек',
+    seek_backward_toast: '-5 сек',
   }
 };
 
@@ -445,10 +510,9 @@ export function t(key: TranslationKey, params?: Record<string, string | number>)
 
 export function useI18n() {
   const state = useStore(store, (s) => s);
-  return {
-    lang: state.lang,
-    setLang,
-    t: (key: TranslationKey, params?: Record<string, string | number>) => {
+
+  const tFn = useCallback(
+    (key: TranslationKey, params?: Record<string, string | number>) => {
       const dict = translations[state.lang] || translations.tr;
       let text: string = dict[key] || translations.tr[key] || key;
       if (params) {
@@ -457,6 +521,16 @@ export function useI18n() {
         }
       }
       return text;
-    }
-  };
+    },
+    [state.lang]
+  );
+
+  return useMemo(
+    () => ({
+      lang: state.lang,
+      setLang,
+      t: tFn
+    }),
+    [state.lang, tFn]
+  );
 }

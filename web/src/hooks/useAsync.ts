@@ -21,7 +21,7 @@ export function useAsync<T>(fn: (signal: AbortSignal) => Promise<T>, deps: reado
 
   useEffect(() => {
     if (!enabled) {
-      setState({ data: null, loading: false, error: null });
+      setState((s) => (s.loading || s.data !== null || s.error !== null ? { data: null, loading: false, error: null } : s));
       return;
     }
     const ctrl = new AbortController();

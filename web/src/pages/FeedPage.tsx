@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { RouteProps } from '../router/router';
 import { navigate } from '../router/router';
 import { FeedScroller } from '../components/FeedScroller';
@@ -8,13 +8,14 @@ import { ensureFeed, feedKey, refreshFeed, useFeedItems, useFeedMeta } from '../
 import type { FeedKind } from '../store/feed';
 import { useAuthStatus } from '../store/auth';
 import { setSound, useSoundOn } from '../store/ui';
+import { ShortcutsModal } from '../components/ShortcutsModal';
 
 /* docs-perf-notes: the HUD is the only thing on this page that cares about the speaker
    toggle, so it owns that subscription. Before, a sound flip re-rendered FeedPage and
    cascaded into the scroller + every card. */
 import { useI18n } from '../store/i18n';
 
-function FeedHud({ feedKey: key, kind }: { feedKey: string; kind: FeedKind }) {
+function FeedHud({ feedKey: key, kind, onOpenShortcuts }: { feedKey: string; kind: FeedKind; onOpenShortcuts: () => void }) {
   const { t } = useI18n();
   const soundOn = useSoundOn();
   return (
@@ -29,6 +30,14 @@ function FeedHud({ feedKey: key, kind }: { feedKey: string; kind: FeedKind }) {
         <VolumeIcon size={17} on={soundOn} strokeWidth={1.9} />
       </button>
       <FeedRefreshButton feedKey={key} kind={kind} />
+      <button
+        className="hud-btn hud-btn-shortcuts"
+        title={`${t('shortcuts_title')} (?)`}
+        aria-label={t('shortcuts_title')}
+        onClick={onOpenShortcuts}
+      >
+        <span className="hud-keyboard-icon" aria-hidden="true">⌨</span>
+      </button>
     </div>
   );
 }
@@ -51,6 +60,7 @@ function FeedRefreshButton({ feedKey: key, kind }: { feedKey: string; kind: Feed
 
 export default function FeedPage({ params }: RouteProps) {
   const { t } = useI18n();
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const kind: FeedKind = params.mode === 'following' ? 'following' : 'recommend';
   const key = feedKey(kind);
   const items = useFeedItems(key);
@@ -88,9 +98,20 @@ export default function FeedPage({ params }: RouteProps) {
 
   return (
     <>
-      <FeedScroller feedKey={key} kind={kind} items={items} empty={empty} />
-      <FeedHud feedKey={key} kind={kind} />
+      <FeedScroller
+        feedKey={key}
+        kind={kind}
+        items={items}
+        empty={empty}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
+      />
+      <FeedHud
+        feedKey={key}
+        kind={kind}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
+      />
       {meta.loadingMore ? <div className="feed-more">{t('feed_loading_more')}</div> : null}
+      <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </>
   );
 }
