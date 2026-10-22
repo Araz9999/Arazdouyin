@@ -14,6 +14,7 @@ const UserPage = lazy(() => import('../pages/UserPage'));
 const UploadPage = lazy(() => import('../pages/UploadPage'));
 const MessagesPage = lazy(() => import('../pages/MessagesPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
+const LivePage = lazy(() => import('../pages/LivePage'));
 
 export function resolveRoute(route: RouteState): RouteMatch | null {
   const segs = route.path.split('/').filter(Boolean);
@@ -23,12 +24,27 @@ export function resolveRoute(route: RouteState): RouteMatch | null {
     case 'follow':
       return { component: FeedPage, cacheKey: 'feed:following', params: { mode: 'following' } };
     case 'friends':
+      return { component: FeedPage, cacheKey: 'feed:friends', params: { mode: 'friends' } };
+    case 'nearby':
+      return { component: FeedPage, cacheKey: 'feed:nearby', params: { mode: 'nearby' } };
+    case 'shopping':
+      return { component: FeedPage, cacheKey: 'feed:shopping', params: { mode: 'shopping' } };
+    case 'featured':
+      return { component: FeedPage, cacheKey: 'feed:featured', params: { mode: 'featured' } };
     case 'live':
-      return { component: FeedPage, cacheKey: `feed:recommend:${segs[0]}`, params: { mode: 'recommend' } };
+      return {
+        component: LivePage,
+        cacheKey: `live:${segs[1] || 'lobby'}`,
+        params: segs[1] ? { roomId: segs[1] } : {}
+      };
     case 'my':
       return { component: UserPage, cacheKey: 'user:me', params: { id: 'me' } };
     case 'search':
       return { component: SearchPage, cacheKey: `search:${route.search}`, params: {} };
+    case 'challenge':
+      return segs[1]
+        ? { component: SearchPage, cacheKey: `challenge:${segs[1]}`, params: { challenge: segs[1] } }
+        : { component: SearchPage, cacheKey: 'challenge:all', params: {} };
     case 'video':
       return segs[1] ? { component: VideoPage, cacheKey: `video:${segs[1]}`, params: { id: segs[1] } } : null;
     case 'user':

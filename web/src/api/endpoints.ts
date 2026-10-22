@@ -1,10 +1,18 @@
 import { api, mediaUrl } from './client';
 import type {
+  AiAssistResponse,
   AuthResponse,
+  ChallengeDetailResponse,
   Comment,
   Conversation,
+  DiscoverResponse,
+  LiveRoom,
+  LiveStreamItem,
   Message,
+  MusicItem,
   Paged,
+  PlaceItem,
+  ProductItem,
   User,
   UserStats,
   Video
@@ -91,11 +99,16 @@ export const userApi = {
 };
 
 export const feedApi = {
-  page: (kind: 'recommend' | 'following', cursor: string | null, limit = 12) =>
-    api.get<Paged<Video>>(
-      `${kind === 'following' ? '/following-feed' : '/feed'}?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
-      { ttl: 0 }
-    )
+  page: (kind: string, cursor: string | null, limit = 12) => {
+    const isFollowing = kind === 'following';
+    const base = isFollowing ? '/following-feed' : '/feed';
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (!isFollowing && kind && kind !== 'recommend') {
+      params.set('tab', kind);
+    }
+    if (cursor) params.set('cursor', cursor);
+    return api.get<Paged<Video>>(`${base}?${params.toString()}`, { ttl: 0 });
+  }
 };
 
 export const videoApi = {
@@ -141,7 +154,69 @@ export const searchApi = {
         users: asArray<User>(raw, ['users']).map(normalizeUser),
         nextCursor: cursorOf(raw)
       }));
-  }
+  },
+  searchMulti: (q: string, category = 'all', cursor: string | null = null, limit = 20, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ q, category, limit: String(limit) });
+    if (cursor) params.set('cursor', cursor);
+    return api
+      .get<{
+        videos?: Video[];
+        users?: User[];
+        products?: ProductItem[];
+        live_streams?: LiveStreamItem[];
+        places?: PlaceItem[];
+        music?: MusicItem[];
+        next_cursor?: string | null;
+      }>(`/search?${params.toString()}`, { ttl: 20000, signal })
+      .then((raw) => ({
+        videos: asArray<Video>(raw, ['videos']).map(normalizeVideo),
+        users: asArray<User>(raw, ['users']).map(normalizeUser),
+        products: asArray<ProductItem>(raw, ['products']),
+        liveStreams: asArray<LiveStreamItem>(raw, ['live_streams']),
+        places: asArray<PlaceItem>(raw, ['places']),
+        music: asArray<MusicItem>(raw, ['music']),
+        nextCursor: cursorOf(raw)
+      }));
+  },
+  discover: (signal?: AbortSignal) =>
+    api.get<DiscoverResponse>('/discover', { ttl: 30000, signal }),
+  challenge: (tag: string, signal?: AbortSignal) =>
+    api.get<ChallengeDetailResponse>(`/challenges/${encodeURIComponent(tag)}`, { ttl: 30000, signal }).then((res) => ({
+      challenge: res.challenge,
+      videos: (res.videos ?? []).map(normalizeVideo)
+    })),
+  aiAssist: (query: string) =>
+    api.post<AiAssistResponse>('/ai/assist', { query })
+};
+
+export const liveApi = {
+  rooms: (filter = 'all', signal?: AbortSignal) =>
+    api.get<{ items: LiveRoom[] }>(`/live/rooms?filter=${encodeURIComponent(filter)}`, { ttl: 0, signal }).then((res) => res.items || []),
+  room: (id: string, signal?: AbortSignal) =>
+    api.get<{ room: LiveRoom }>(`/live/rooms/${encodeURIComponent(id)}`, { ttl: 0, signal }).then((res) => res.room),
+  comment: (id: string, body: { user: string; avatar_color?: string; text: string; badge?: string }) =>
+    api.post<{ ok: boolean; comment: unknown }>(`/live/rooms/${encodeURIComponent(id)}/comment`, body),
+  gift: (
+    id: string,
+    body: {
+      from: string;
+      gift_name: string;
+      gift_icon: string;
+      amount_rub: number;
+      diamonds: number;
+      target_team?: string;
+      donate_service?: string;
+      custom_message?: string;
+    }
+  ) => api.post<{ ok: boolean; gift: unknown }>(`/live/rooms/${encodeURIComponent(id)}/gift`, body),
+  boostPk: (id: string, team: 'team_a' | 'team_b', points = 50) =>
+    api.post<{ ok: boolean }>(`/live/rooms/${encodeURIComponent(id)}/pk/boost`, { team, points }),
+  votePoll: (id: string, option_id: string) =>
+    api.post<{ ok: boolean; poll: unknown }>(`/live/rooms/${encodeURIComponent(id)}/poll/vote`, { option_id }),
+  joinLuckyDraw: (id: string, user_name: string) =>
+    api.post<{ ok: boolean; lucky_draw: unknown }>(`/live/rooms/${encodeURIComponent(id)}/luckydraw/join`, { user_name }),
+  buyProduct: (id: string, product_id: string, user_name: string) =>
+    api.post<{ ok: boolean; product: unknown }>(`/live/rooms/${encodeURIComponent(id)}/buy`, { product_id, user_name })
 };
 
 export const chatApi = {

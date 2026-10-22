@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from '../router/Link';
 import { useRoute } from '../router/router';
 import { Avatar } from './Avatar';
-import { BrandMark, FriendIcon, HomeIcon, LiveIcon, MeIcon, FollowIcon } from './icons';
+import { BrandMark, FriendIcon, HomeIcon, LiveIcon, MeIcon, FollowIcon, MapPinIcon, ShoppingBagIcon, CrownIcon } from './icons';
 import { useAuthStatus, useSelf } from '../store/auth';
 import { readRecents, type RecentUser } from '../utils/recents';
 
@@ -10,9 +10,12 @@ import { useI18n, type TranslationKey } from '../store/i18n';
 import { LangSwitcher } from './LangSwitcher';
 
 const NAV_KEYS: { to: string; labelKey: TranslationKey; Icon: typeof HomeIcon }[] = [
-  { to: '/', labelKey: 'nav_recommend', Icon: HomeIcon },
-  { to: '/follow', labelKey: 'nav_following', Icon: FollowIcon },
-  { to: '/friends', labelKey: 'nav_friends', Icon: FriendIcon },
+  { to: '/', labelKey: 'tab_recommend', Icon: HomeIcon },
+  { to: '/follow', labelKey: 'tab_following', Icon: FollowIcon },
+  { to: '/friends', labelKey: 'tab_friends', Icon: FriendIcon },
+  { to: '/nearby', labelKey: 'tab_nearby', Icon: MapPinIcon },
+  { to: '/shopping', labelKey: 'tab_shopping', Icon: ShoppingBagIcon },
+  { to: '/featured', labelKey: 'tab_featured', Icon: CrownIcon },
   { to: '/my', labelKey: 'nav_my', Icon: MeIcon },
   { to: '/live', labelKey: 'nav_live', Icon: LiveIcon }
 ];

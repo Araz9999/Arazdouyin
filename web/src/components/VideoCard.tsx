@@ -2,12 +2,13 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { Video } from '../api/types';
 import { ActionRail } from './ActionRail';
 import { Avatar } from './Avatar';
-import { VerifiedIcon } from './icons';
+import { CrownIcon, MapPinIcon, ShoppingBagIcon, VerifiedIcon } from './icons';
 import { videoPool } from '../media/videoPool';
 import { reportView, toggleLike } from '../store/feed';
 import { Link } from '../router/Link';
 import { formatCount, formatDuration, tagOf, timeAgo } from '../utils/format';
 import { useI18n } from '../store/i18n';
+import { toast } from '../store/ui';
 
 type Props = {
   video: Video;
@@ -60,8 +61,8 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
 
   useEffect(() => {
     if (!active) return;
-    reportView(video.id);
-  }, [active, video.id]);
+    reportView(video.id, video);
+  }, [active, video.id, video]);
 
   /* the 2-line clamp is a visual truncate, so scrollHeight === clientHeight while it is applied
      and the old "scrollHeight - clientHeight > 4" test never fired: long captions painted at
@@ -255,6 +256,22 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
             </svg>
           </div>
           <div className="card-meta">
+            {video.featured || video.location ? (
+              <div className="card-top-badges">
+                {video.featured ? (
+                  <span className="card-featured-badge">
+                    <CrownIcon size={12} strokeWidth={2} />
+                    <span>{t('featured_badge')}</span>
+                  </span>
+                ) : null}
+                {video.location ? (
+                  <span className="card-location-badge">
+                    <MapPinIcon size={12} strokeWidth={2} />
+                    <span>{video.location}</span>
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
             <Link to={`/user/${author.id}`} className="meta-author">
               <Avatar user={author} size={26} />
               <span className="meta-name">
@@ -269,6 +286,32 @@ export const VideoCard = memo(function VideoCard({ video, index, active, registe
             >
               {caption || t('no_caption')}
             </p>
+            {video.product ? (
+              <div className="card-product-strip" onClick={(e) => e.stopPropagation()}>
+                <div className="card-product-tag-lead">
+                  <ShoppingBagIcon size={15} on={true} />
+                  <span className="product-fastmall">{t('shopping_mall_badge')}</span>
+                </div>
+                <div className="card-product-details">
+                  <span className="product-title">{video.product.title}</span>
+                  <div className="product-price-row">
+                    <span className="product-price">{video.product.price}</span>
+                    {video.product.original_price ? (
+                      <del className="product-old-price">{video.product.original_price}</del>
+                    ) : null}
+                    {video.product.sales_tag || video.product.sales || video.product.tag ? (
+                      <span className="product-sales-tag">{video.product.sales_tag || video.product.sales || video.product.tag}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <button
+                  className="card-product-buy"
+                  onClick={() => toast(`${video.product?.title} (${video.product?.price})`, 'ok')}
+                >
+                  {t('shopping_cart_btn')}
+                </button>
+              </div>
+            ) : null}
             <div className="meta-sub">
               {video.duration > 0 ? (
                 <span className={`meta-duration${video.duration >= 60 ? ' long' : ''}`} title={t('video_duration_label')}>

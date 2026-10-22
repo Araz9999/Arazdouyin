@@ -14,7 +14,7 @@ import { setSound, useSoundOn } from './store/ui';
 import { videoPool } from './media/videoPool';
 import { useI18n } from './store/i18n';
 
-const FEED_PATHS = new Set(['/', '/follow', '/friends', '/live']);
+const FEED_PATHS = new Set(['/', '/follow', '/friends', '/nearby', '/shopping', '/featured', '/live']);
 
 /* docs-perf-notes: App used to subscribe to the whole ui + auth state, so a toast, a drawer
    open or a sheet close re-rendered every shell component and the feed page underneath it.

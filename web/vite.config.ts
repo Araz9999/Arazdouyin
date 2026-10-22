@@ -17,7 +17,8 @@ export default defineConfig({
     port: Number(process.env.DY_WEB_PORT) || 5173,
     proxy: {
       "/api": { target: apiTarget, changeOrigin: true },
-      "/media": { target: apiTarget, changeOrigin: true }
+      "/media": { target: apiTarget, changeOrigin: true },
+      "/ws": { target: apiTarget, ws: true, changeOrigin: true }
     }
   },
   build: {

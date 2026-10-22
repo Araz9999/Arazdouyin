@@ -209,6 +209,103 @@ export function VolumeIcon({ size = 20, className, on, strokeWidth = 1.8 }: Icon
   );
 }
 
+export function MapPinIcon({ size = 22, className, on, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={on ? 0 : strokeWidth}>
+      <path d="M12 21s-6-5.4-6-10a6 6 0 1 1 12 0c0 4.6-6 10-6 10Z" fill={on ? 'currentColor' : 'none'} />
+      <circle cx="12" cy="11" r="2.5" fill={on ? '#0f0f13' : 'currentColor'} stroke="none" />
+    </Svg>
+  );
+}
+
+export function ShoppingBagIcon({ size = 22, className, on, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={on ? 0 : strokeWidth}>
+      <path d="M6 7h12l1.5 13H4.5L6 7Z" fill={on ? 'currentColor' : 'none'} />
+      <path d="M9 7V5a3 3 0 0 1 6 0v2" fill="none" />
+    </Svg>
+  );
+}
+
+export function CrownIcon({ size = 22, className, on, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={on ? 0 : strokeWidth}>
+      <path d="m3 18 2.5-9 4.5 4.5L12 5l2 8.5 4.5-4.5 2.5 9H3Z" fill={on ? 'currentColor' : 'none'} />
+    </Svg>
+  );
+}
+
+export function ScissorsIcon({ size = 20, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={strokeWidth}>
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M20 4 8.1 15.9M8.1 8.1 20 20" />
+    </Svg>
+  );
+}
+
+export function WandIcon({ size = 20, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={strokeWidth}>
+      <path d="m15 4 5 5M14 6l6 6M4 20l10-10-2-2L2 18l2 2Z" />
+      <path d="M19 15v4M17 17h4M6 4v3M4.5 5.5h3" />
+    </Svg>
+  );
+}
+
+export function FilterIcon({ size = 20, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={strokeWidth}>
+      <circle cx="9" cy="12" r="5" />
+      <circle cx="15" cy="12" r="5" />
+    </Svg>
+  );
+}
+
+export function SparklesIcon({ size = 20, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={strokeWidth}>
+      <path d="m12 3 2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5ZM19 16l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1 1-2.5Z" />
+    </Svg>
+  );
+}
+
+export function StickerIcon({ size = 20, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={strokeWidth}>
+      <path d="M14 3v4a2 2 0 0 0 2 2h4" />
+      <path d="M4 16c0 2.2 1.8 4 4 4h8a4 4 0 0 0 4-4V9l-6-6H8C5.8 3 4 4.8 4 7v9Z" />
+    </Svg>
+  );
+}
+
+export function TextIcon({ size = 20, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={strokeWidth}>
+      <path d="M4 7V4h16v3M12 4v16M9 20h6" />
+    </Svg>
+  );
+}
+
+export function MusicIcon({ size = 20, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={strokeWidth}>
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+    </Svg>
+  );
+}
+
+export function FireIcon({ size = 20, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg size={size} className={className} strokeWidth={strokeWidth}>
+      <path d="M8.5 14.5A4.5 4.5 0 0 0 13 19a4.5 4.5 0 0 0 4.5-4.5c0-4-4.5-7.5-4.5-7.5s-1.5 2-1.5 3.5a2.5 2.5 0 0 1-3-2c0 2-2 3.5-2 6Z" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
+
 export function PlayIcon({ size = 22, className }: IconProps) {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">

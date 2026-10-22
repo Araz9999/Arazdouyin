@@ -6,15 +6,15 @@ import { probeVideo, releaseProbe, uploadVideo, type Probe } from '../media/uplo
 import { feedStore } from '../store/feed';
 import { useAuthStatus } from '../store/auth';
 import { toast } from '../store/ui';
-import { SpinnerIcon, UploadIcon } from '../components/icons';
+import { SpinnerIcon, UploadIcon, WandIcon } from '../components/icons';
 import { formatDuration } from '../utils/format';
-
+import { VideoEditor, type VideoEditorState } from '../components/VideoEditor';
 import { useI18n } from '../store/i18n';
 
 const MAX_MB = 200;
 
 export default function UploadPage(_props: RouteProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const status = useAuthStatus();
   const [file, setFile] = useState<File | null>(null);
   const [probe, setProbe] = useState<Probe | null>(null);
@@ -23,6 +23,7 @@ export default function UploadPage(_props: RouteProps) {
   const [stage, setStage] = useState<'pick' | 'ready' | 'uploading' | 'done'>('pick');
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [editorState, setEditorState] = useState<VideoEditorState | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const probeRef = useRef<Probe | null>(null);
 
@@ -78,16 +79,23 @@ export default function UploadPage(_props: RouteProps) {
     setStage('uploading');
     setProgress(0);
     setError(null);
+
+    const finalDuration = editorState
+      ? Math.max(0.5, Math.round(((editorState.trimEnd - editorState.trimStart) / editorState.speed) * 10) / 10)
+      : probe.duration;
+
+    const finalCaption = caption.trim();
+
     try {
       const uploaded = await uploadVideo(
         file,
-        { caption: caption.trim(), duration: probe.duration, width: probe.width, height: probe.height },
+        { caption: finalCaption, duration: finalDuration, width: probe.width, height: probe.height },
         setProgress
       );
       setProgress(1);
       const created = await videoApi.create({
-        caption: caption.trim(),
-        duration: probe.duration,
+        caption: finalCaption,
+        duration: finalDuration,
         width: probe.width,
         height: probe.height,
         poster: probe.poster,
@@ -111,97 +119,124 @@ export default function UploadPage(_props: RouteProps) {
     void accept(e.dataTransfer.files?.[0] ?? null);
   };
 
+  const handleAiHookQuick = () => {
+    const hook =
+      lang === 'ru'
+        ? 'Смотри до конца, такого ты точно не ожидал! 😱 #тренды #рек #FastVideo #Shorts'
+        : 'Bunu sonuna kadar izleyenler şokta! 😱 Kesinlikle denemelisiniz #Viral #Trend #Keşfet #Shorts #FastVideo';
+    setCaption(hook);
+    toast(t('editor_ai_hook'), 'ok');
+  };
+
   return (
     <div className="upload-page">
       <div className="page-head">
         <h1>{t('upload_title')}</h1>
       </div>
-      <div className="upload-grid">
-        <div
-          className={`dropzone${dragging ? ' dragging' : ''}${file ? ' filled' : ''}`}
-          role="button"
-          tabIndex={0}
-          aria-label={t('upload_drop_title')}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter' && e.key !== ' ') return;
-            e.preventDefault();
-            inputRef.current?.click();
-          }}
-        >
-          {probe ? (
-            <video className="upload-preview" src={probe.objectUrl} controls muted playsInline loop />
-          ) : (
-            <>
-              <UploadIcon size={34} strokeWidth={1.6} />
-              <p>{t('upload_drop_title')}</p>
-              <span className="drop-hint">{t('upload_drop_hint')}</span>
-              <span className="drop-length-info">{t('upload_length_info')}</span>
-            </>
-          )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="video/*"
-            hidden
-            onChange={(e) => void accept(e.target.files?.[0] ?? null)}
-          />
-        </div>
-        <div className="upload-form">
-          <label className="field">
-            <span>{t('upload_caption_label')}</span>
-            <textarea
-              rows={4}
-              value={caption}
-              maxLength={200}
-              placeholder={t('upload_caption_placeholder')}
-              onChange={(e) => setCaption(e.target.value)}
+
+      {!probe ? (
+        <div className="upload-grid upload-grid-empty">
+          <div
+            className={`dropzone${dragging ? ' dragging' : ''}`}
+            role="button"
+            tabIndex={0}
+            aria-label={t('upload_drop_title')}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              e.preventDefault();
+              inputRef.current?.click();
+            }}
+          >
+            <UploadIcon size={44} strokeWidth={1.6} />
+            <p>{t('upload_drop_title')}</p>
+            <span className="drop-hint">{t('upload_drop_hint')}</span>
+            <span className="drop-length-info">{t('upload_length_info')}</span>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="video/*"
+              hidden
+              onChange={(e) => void accept(e.target.files?.[0] ?? null)}
             />
-          </label>
-          <dl className="meta-list">
-            <div>
-              <dt>{t('upload_meta_duration')}</dt>
-              <dd>
-                {probe ? (
-                  <>
-                    <span>{formatDuration(probe.duration)}</span>
-                    {probe.duration >= 60 ? (
-                      <span className="upload-duration-pill"> ({t('tag_long_video')})</span>
-                    ) : null}
-                  </>
-                ) : (
-                  '—'
-                )}
-              </dd>
+          </div>
+        </div>
+      ) : (
+        <div className="upload-editor-layout">
+          {/* CapCut Video Editing Suite */}
+          <VideoEditor
+            videoUrl={probe.objectUrl}
+            duration={probe.duration}
+            onStateChange={setEditorState}
+            onApplyAiCaption={(c) => setCaption(c)}
+          />
+
+          {/* Publishing Form & Metadata */}
+          <div className="upload-publish-bar">
+            <div className="publish-caption-box">
+              <div className="caption-head-row">
+                <label className="caption-label">{t('upload_caption_label')}</label>
+                <button
+                  type="button"
+                  className="btn ghost pill small ai-quick-btn"
+                  onClick={handleAiHookQuick}
+                  title="Yapay zeka ile viral başlık ve etiket üret"
+                >
+                  <WandIcon size={13} />
+                  <span>{t('editor_ai_hook')}</span>
+                </button>
+              </div>
+              <textarea
+                rows={3}
+                value={caption}
+                maxLength={200}
+                placeholder={t('upload_caption_placeholder')}
+                onChange={(e) => setCaption(e.target.value)}
+                className="publish-caption-input"
+              />
             </div>
-            <div>
-              <dt>{t('upload_meta_resolution')}</dt>
-              <dd>{probe ? `${probe.width}×${probe.height}` : '—'}</dd>
+
+            <div className="publish-meta-summary">
+              <div className="meta-summary-item">
+                <span>{t('upload_meta_duration')}:</span>
+                <strong>
+                  {formatDuration(
+                    editorState
+                      ? Math.max(0.5, (editorState.trimEnd - editorState.trimStart) / editorState.speed)
+                      : probe.duration
+                  )}
+                </strong>
+              </div>
+              <div className="meta-summary-item">
+                <span>{t('upload_meta_resolution')}:</span>
+                <strong>{probe.width}×{probe.height}</strong>
+              </div>
+              <div className="meta-summary-item">
+                <span>{t('upload_meta_size')}:</span>
+                <strong>{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : '—'}</strong>
+              </div>
+              <div className="meta-summary-item">
+                <span>{t('action_speed')}:</span>
+                <strong>{editorState ? `${editorState.speed}x` : '1.0x'}</strong>
+              </div>
             </div>
-            <div>
-              <dt>{t('upload_meta_size')}</dt>
-              <dd>{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : '—'}</dd>
-            </div>
-            <div>
-              <dt>{t('upload_meta_filename')}</dt>
-              <dd className="ellipsis">{file?.name ?? '—'}</dd>
-            </div>
-          </dl>
-          {stage === 'uploading' || stage === 'done' ? (
-            <div className="progress">
-              <div className="progress-fill" style={{ transform: `scaleX(${progress})` }} />
-              <span>{Math.round(progress * 100)}%</span>
-            </div>
-          ) : null}
-          {error ? <p className="form-error">{error}</p> : null}
-          <div className="row-actions">
-            {file ? (
+
+            {stage === 'uploading' || stage === 'done' ? (
+              <div className="progress publish-progress">
+                <div className="progress-fill" style={{ transform: `scaleX(${progress})` }} />
+                <span>{Math.round(progress * 100)}%</span>
+              </div>
+            ) : null}
+
+            {error ? <p className="form-error">{error}</p> : null}
+
+            <div className="publish-actions-row">
               <button
                 className="btn ghost pill"
                 onClick={() => {
@@ -214,14 +249,18 @@ export default function UploadPage(_props: RouteProps) {
               >
                 {t('action_reselect')}
               </button>
-            ) : null}
-            <button className="btn accent pill" onClick={publish} disabled={!probe || stage === 'uploading'}>
-              {stage === 'uploading' ? <SpinnerIcon size={17} /> : null}
-              <span>{stage === 'uploading' ? t('action_uploading') : t('action_publish')}</span>
-            </button>
+              <button
+                className="btn accent pill publish-submit-btn"
+                onClick={publish}
+                disabled={!probe || stage === 'uploading'}
+              >
+                {stage === 'uploading' ? <SpinnerIcon size={17} /> : null}
+                <span>{stage === 'uploading' ? t('action_uploading') : t('action_publish')}</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

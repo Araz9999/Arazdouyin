@@ -58,10 +58,23 @@ function FeedRefreshButton({ feedKey: key, kind }: { feedKey: string; kind: Feed
   );
 }
 
+import type { TranslationKey } from '../store/i18n';
+
+const FEED_TABS: { kind: FeedKind; path: string; labelKey: TranslationKey }[] = [
+  { kind: 'nearby', path: '/nearby', labelKey: 'tab_nearby' },
+  { kind: 'friends', path: '/friends', labelKey: 'tab_friends' },
+  { kind: 'following', path: '/follow', labelKey: 'tab_following' },
+  { kind: 'recommend', path: '/', labelKey: 'tab_recommend' },
+  { kind: 'shopping', path: '/shopping', labelKey: 'tab_shopping' },
+  { kind: 'featured', path: '/featured', labelKey: 'tab_featured' }
+];
+
 export default function FeedPage({ params }: RouteProps) {
   const { t } = useI18n();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const kind: FeedKind = params.mode === 'following' ? 'following' : 'recommend';
+  const rawKind = params.mode as FeedKind;
+  const validKinds: FeedKind[] = ['recommend', 'following', 'friends', 'nearby', 'shopping', 'featured'];
+  const kind: FeedKind = validKinds.includes(rawKind) ? rawKind : 'recommend';
   const key = feedKey(kind);
   const items = useFeedItems(key);
   const meta = useFeedMeta(key);
@@ -98,6 +111,30 @@ export default function FeedPage({ params }: RouteProps) {
 
   return (
     <>
+      <header className="feed-header-bar">
+        <nav className="feed-top-tabs" aria-label="Feed Navigation">
+          {FEED_TABS.map((tab) => (
+            <button
+              key={tab.kind}
+              className={`feed-tab-btn${kind === tab.kind ? ' active' : ''}`}
+              onClick={() => navigate(tab.path)}
+            >
+              <span className="feed-tab-label">{t(tab.labelKey)}</span>
+              {kind === tab.kind ? <span className="feed-tab-indicator" /> : null}
+            </button>
+          ))}
+        </nav>
+        {kind === 'nearby' ? (
+          <div className="feed-sub-bar nearby-sub-bar">
+            <span>📍 Kadıköy, İstanbul · &lt; 2 km</span>
+          </div>
+        ) : null}
+        {kind === 'shopping' ? (
+          <div className="feed-sub-bar shopping-sub-bar">
+            <span>🛍️ FastMall · Özel İndirimler & Canlı Satışlar</span>
+          </div>
+        ) : null}
+      </header>
       <FeedScroller
         feedKey={key}
         kind={kind}

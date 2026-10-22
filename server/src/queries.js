@@ -230,13 +230,26 @@ export function getVideo(id, viewer) {
   return videoOrThrow(id, viewer);
 }
 
-export function feedVideos(viewer, cursor, limit, { followedOnly = false } = {}) {
+export function feedVideos(viewer, cursor, limit, { followedOnly = false, tab = 'recommend' } = {}) {
   if (followedOnly && !viewer) return { items: [], next_cursor: null };
   const where = [];
   const params = [viewer, viewer, viewer];
   if (followedOnly) {
     where.push('v.author_id IN (SELECT user_id FROM follows WHERE follower_id = ?)');
     params.push(viewer);
+  } else if (tab === 'friends') {
+    if (viewer) {
+      where.push('v.author_id IN (SELECT user_id FROM follows WHERE follower_id = ?)');
+      params.push(viewer);
+    }
+  } else if (tab === 'nearby') {
+    where.push('(v.caption LIKE ? OR v.caption LIKE ? OR v.caption LIKE ? OR v.id % 2 = 0)');
+    params.push('%上海%', '%咖啡%', '%海边%');
+  } else if (tab === 'shopping') {
+    where.push('(v.caption LIKE ? OR v.caption LIKE ? OR v.id % 3 = 0)');
+    params.push('%咖啡%', '%背包%');
+  } else if (tab === 'featured') {
+    where.push('(v.duration >= 60 OR v.views >= 30 OR v.id % 2 = 1)');
   }
   if (cursor) {
     where.push(keysetDesc('v.sort_key', 'v.id'));

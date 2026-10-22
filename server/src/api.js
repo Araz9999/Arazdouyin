@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { GoogleGenAI } from '@google/genai';
 
 import { createToken, hashPassword, verifyPassword } from './auth.js';
 import { MAX_UPLOAD_BYTES } from './config.js';
@@ -12,6 +13,11 @@ import { Router } from './router.js';
 import { ensureMediaDir, resolveMediaPath, saveUpload, streamFile } from './media.js';
 import { perfSnapshot } from './perfmon.js';
 import { userFromRow, videoFromRow } from './models.js';
+import {
+  HOT_SEARCHES, LIFESTYLE_GUIDES, CHALLENGES, PRODUCTS_LIST,
+  LIVE_STREAMS, MUSIC_TRACKS, PLACES_LIST
+} from './discovery.js';
+import { liveManager } from './live.js';
 import {
   cursorPos, decodeCursor, encodeCursor, httpError, limitFrom, now, optionalColor, optionalNumber,
   optionalString, pickColor, requireString, syntheticPoster,
@@ -216,7 +222,8 @@ export function buildRouter() {
 
   route('GET', '/api/feed', ({ query, viewer }) => {
     const limit = limitFrom(query.get('limit'), FEED_LIMIT, MAX_LIMIT);
-    return pageResponse(feedVideos(viewer || 0, readCursor(query), limit, {}));
+    const tab = query.get('tab') || 'recommend';
+    return pageResponse(feedVideos(viewer || 0, readCursor(query), limit, { tab }));
   });
 
   route('GET', '/api/following-feed', ({ query, viewer }) => {
@@ -338,17 +345,144 @@ export function buildRouter() {
     return { ok: true };
   });
 
+  /* --------------------------------------------------------------- discover -- */
+
+  route('GET', '/api/discover', () => ({
+    hot_searches: HOT_SEARCHES,
+    lifestyle_guides: LIFESTYLE_GUIDES,
+    challenges: CHALLENGES,
+  }));
+
+  route('GET', '/api/challenges/:tag', ({ params, viewer }) => {
+    const rawTag = (params.tag || '').replace(/^#/, '').toLowerCase();
+    const found = CHALLENGES.find((c) => c.tag.toLowerCase() === rawTag) || {
+      tag: params.tag,
+      title: `#${params.tag} Çağırışı`,
+      description: `#${params.tag} trend videoları və icma iştirakçıları.`,
+      views: '1.5M',
+      participants: '2.4K',
+      reward: 'FastVideo Creator Nişanı',
+      banner: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+      joinedTag: `#${params.tag}`,
+    };
+    const searchResult = search(params.tag, viewer || 0, null, { videoLimit: 24, userLimit: 0 });
+    return {
+      challenge: found,
+      videos: searchResult.videos,
+    };
+  });
+
   /* ----------------------------------------------------------------- search -- */
 
   route('GET', '/api/search', ({ query, viewer }) => {
     const term = (query.get('q') || '').trim();
     const limit = limitFrom(query.get('limit'), 20, MAX_LIMIT);
-    if (!term) return { videos: [], users: [], next_cursor: null };
+    if (!term) {
+      return {
+        videos: [],
+        users: [],
+        products: [],
+        live_streams: [],
+        places: [],
+        music: [],
+        next_cursor: null,
+      };
+    }
     const result = search(term, viewer || 0, readSearchCursor(query), { videoLimit: limit, userLimit: limit });
+    const needle = term.toLowerCase();
+
+    const matchedProducts = PRODUCTS_LIST.filter(
+      (p) => p.title.toLowerCase().includes(needle) || p.tag.toLowerCase().includes(needle) || p.category.toLowerCase().includes(needle)
+    );
+    const matchedLive = LIVE_STREAMS.filter(
+      (l) => l.title.toLowerCase().includes(needle) || l.category.toLowerCase().includes(needle) || l.streamer.toLowerCase().includes(needle)
+    );
+    const matchedPlaces = PLACES_LIST.filter(
+      (pl) => pl.name.toLowerCase().includes(needle) || pl.city.toLowerCase().includes(needle) || pl.category.toLowerCase().includes(needle) || pl.description.toLowerCase().includes(needle)
+    );
+    const matchedMusic = MUSIC_TRACKS.filter(
+      (m) => m.title.toLowerCase().includes(needle) || m.artist.toLowerCase().includes(needle)
+    );
+
     return {
       videos: result.videos,
       users: result.users,
+      products: matchedProducts,
+      live_streams: matchedLive,
+      places: matchedPlaces,
+      music: matchedMusic,
       next_cursor: result.next_cursor ? encodeCursor(result.next_cursor) : null,
+    };
+  });
+
+  /* -------------------------------------------------------------- AI Assist -- */
+
+  route('POST', '/api/ai/assist', async ({ body }) => {
+    const query = requireString(body, 'query', { max: 500 }).trim();
+    if (!query) throw httpError(400, 'invalid_query', 'query is required');
+
+    let answer = '';
+    let suggestions = [];
+    let relatedTags = [];
+
+    try {
+      const ai = new GoogleGenAI();
+      const prompt = `You are FastVideo AI Assistant (inspired by GigaChat/YandexGPT/Alice style), a smart, youth-friendly lifestyle discovery assistant inside the FastVideo short-video platform.
+User Query: "${query}"
+
+Guidelines:
+1. Provide a direct, helpful, friendly answer in the same language as the user query (Azerbaijani, Turkish, or Russian).
+2. If asking for a recipe, give a quick ingredient list and 3-4 numbered steps.
+3. If asking for places or cafes (e.g. in Baku, Istanbul, etc.), recommend 2-3 specific spots with their vibe, location, and why youth love them.
+4. If asking for reviews or advice (tech, budget, style, viral videos), give concise pros/cons or actionable tips.
+5. At the very end of your response, output exactly these two lines:
+TAGS: #tag1, #tag2, #tag3
+SUGGESTIONS: suggestion1 | suggestion2`;
+
+      const res = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents: prompt,
+      });
+
+      const rawText = res.text || '';
+      const lines = rawText.split('\n');
+      const cleanLines = [];
+      for (const line of lines) {
+        if (line.startsWith('TAGS:')) {
+          relatedTags = line.replace('TAGS:', '').split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean);
+        } else if (line.startsWith('SUGGESTIONS:')) {
+          suggestions = line.replace('SUGGESTIONS:', '').split('|').map((s) => s.trim()).filter(Boolean);
+        } else {
+          cleanLines.push(line);
+        }
+      }
+      answer = cleanLines.join('\n').trim();
+    } catch {
+      // Graceful smart lifestyle fallback
+      const qLower = query.toLowerCase();
+      if (qLower.includes('resept') || qLower.includes('cheesecake') || qLower.includes('yemək') || qLower.includes('qəhvə')) {
+        answer = `🍳 **Tövsiyə olunan Resept:**\n\n1. Ərzaqları otaq temperaturuna gətirin.\n2. Orta dərəcəli istilikdə 15 dəqiqə ərzində bişirin.\n3. Servis edərkən üzərinə təzə nanə və giləmeyvələr əlavə edin.\n\n💡 *FastVideo ipucu: Videonuzu #MasterResept etiketi ilə paylaşaraq trendə düşün!*`;
+        relatedTags = ['MasterResept', 'SanSebastian', 'EvMetbexi'];
+        suggestions = ['10 dəqiqəlik səhər yeməyi', 'Buzlu qəhvə resepti'];
+      } else if (qLower.includes('yer') || qLower.includes('kafe') || qLower.includes('məkan') || qLower.includes('bakı')) {
+        answer = `📍 **Gənclər üçün Populyar Məkanlar:**\n\n• **İçərişəhər Panoramik Rooftop:** Qız Qalası mənzərəsi, estetik fotolar üçün ideal.\n• **Nizami Street Kitab Evi & Coffee:** Dərs oxumaq və sakit söhbət üçün.\n• **Dənizkənarı Bulvar Günbatımı Terrace:** Axşam gəzintiləri və canlı musiqi.\n\n💡 *Bu məkanlarda çəkilən videoları #SeherKesfi etiketi ilə axtarın!*`;
+        relatedTags = ['SeherKesfi', 'Iceriseher', 'BakuCafe'];
+        suggestions = ['Bulvarda ən yaxşı yerlər', 'Büdcəli kafelər'];
+      } else {
+        answer = `✨ **FastVideo Ağıllı Köməkçi:**\n\n"${query}" ilə bağlı ən populyar videolar, məhsullar və trendlər icmamızda aktiv şəkildə paylaşılır.\n\n• Trend videoları izləmək üçün axtarış bölməsində "Videolar" tabına keçin.\n• Mövzu ilə bağlı çağırışlara qoşularaq auditoriyanızı böyüdün.`;
+        relatedTags = ['Trend2026', 'ViralVideo', 'FastVideo'];
+        suggestions = ['Həftənin ən çox izlənən çağırışı nədir?', 'Bakıda ən yaxşı kafelər'];
+      }
+    }
+
+    if (!relatedTags.length) relatedTags = ['Trend2026', 'Viral', 'Baku'];
+    if (!suggestions.length) suggestions = ['San Sebastian Cheesecake resepti', 'Bakıda ən yaxşı gənclik kafeləri', 'Tələbə üçün büdcəli həyat hiylələri'];
+
+    return {
+      query,
+      answer,
+      related_tags: relatedTags,
+      suggestions: suggestions.slice(0, 3),
     };
   });
 
@@ -381,6 +515,71 @@ export function buildRouter() {
   const mediaHandler = ({ req, res, params }) => streamFile(req, res, resolveMediaPath(params.filename));
   route('GET', '/media/:filename', mediaHandler, { raw: true, public: true });
   route('HEAD', '/media/:filename', mediaHandler, { raw: true, public: true });
+
+  /* ----------------------------------------------------------------- live -- */
+
+  route('GET', '/api/live/rooms', ({ query }) => {
+    const filter = query.get('filter') || 'all';
+    return { items: liveManager.getRoomsList(filter) };
+  }, { public: true });
+
+  route('GET', '/api/live/rooms/:id', ({ params }) => {
+    const room = liveManager.getRoom(params.id);
+    if (!room) throw httpError(404, 'not_found', 'live room not found');
+    return { room };
+  }, { public: true });
+
+  route('POST', '/api/live/rooms/:id/comment', ({ params, body }) => {
+    const comment = liveManager.addComment(params.id, {
+      user: body.user || 'İzləyici',
+      avatar_color: body.avatar_color || '#fe2c55',
+      text: body.text || '',
+      badge: body.badge || 'İzləyici',
+      is_donate: Boolean(body.is_donate),
+      donate_amount: body.donate_amount,
+      donate_service: body.donate_service
+    });
+    if (!comment) throw httpError(404, 'not_found', 'room not found');
+    return { ok: true, comment };
+  }, { public: true });
+
+  route('POST', '/api/live/rooms/:id/gift', ({ params, body }) => {
+    const res = liveManager.sendGift(params.id, {
+      from: body.from || 'İzləyici',
+      gift_name: body.gift_name || 'Gül',
+      gift_icon: body.gift_icon || '🌹',
+      amount_rub: Number(body.amount_rub || 10),
+      diamonds: Number(body.diamonds || 20),
+      target_team: body.target_team || 'team_a',
+      donate_service: body.donate_service,
+      custom_message: body.custom_message
+    });
+    if (!res) throw httpError(404, 'not_found', 'room not found');
+    return { ok: true, gift: res };
+  }, { public: true });
+
+  route('POST', '/api/live/rooms/:id/pk/boost', ({ params, body }) => {
+    liveManager.boostPk(params.id, body.team || 'team_a', Number(body.points || 50));
+    return { ok: true };
+  }, { public: true });
+
+  route('POST', '/api/live/rooms/:id/poll/vote', ({ params, body }) => {
+    const poll = liveManager.votePoll(params.id, body.option_id);
+    if (!poll) throw httpError(400, 'bad_request', 'could not vote on poll');
+    return { ok: true, poll };
+  }, { public: true });
+
+  route('POST', '/api/live/rooms/:id/luckydraw/join', ({ params, body }) => {
+    const draw = liveManager.joinLuckyDraw(params.id, body.user_name || 'İzləyici');
+    if (!draw) throw httpError(400, 'bad_request', 'could not join lucky draw');
+    return { ok: true, lucky_draw: draw };
+  }, { public: true });
+
+  route('POST', '/api/live/rooms/:id/buy', ({ params, body }) => {
+    const prd = liveManager.buyProduct(params.id, body.product_id, body.user_name || 'İzləyici');
+    if (!prd) throw httpError(400, 'out_of_stock', 'product not available or out of stock');
+    return { ok: true, product: prd };
+  }, { public: true });
 
   /* ----------------------------------------------------------------- health -- */
 

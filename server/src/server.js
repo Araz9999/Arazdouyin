@@ -9,6 +9,7 @@ import { dispatch, readJsonBody } from './router.js';
 import { serveStatic } from './static.js';
 import { userExistsCached } from './queries.js';
 import { HttpError, httpError, sendError } from './util.js';
+import { liveManager } from './live.js';
 
 const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -160,9 +161,20 @@ export function createAppServer(options = {}) {
     }
   });
 
-  server.on('error', (error) => {
-    if (error && error.code === 'EADDRINUSE') {
-      console.error(`[fatal] ${HOST}:${PORT} is already in use - stop the other server or set DY_PORT.`);
+  server.on('upgrade', (req, socket, head) => {
+    let pathname = '';
+    try {
+      const url = new URL(req.url, `http://${req.headers.host || `${HOST}:${PORT}`}`);
+      pathname = url.pathname;
+    } catch {
+      pathname = '';
+    }
+    if (pathname.startsWith('/ws')) {
+      liveManager.wss.handleUpgrade(req, socket, head, (ws) => {
+        liveManager.wss.emit('connection', ws, req);
+      });
+    } else {
+      socket.destroy();
     }
   });
 

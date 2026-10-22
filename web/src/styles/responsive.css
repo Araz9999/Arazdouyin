@@ -145,6 +145,39 @@
   .cover {
     height: 128px;
   }
+  .feed-header-bar {
+    top: 6px;
+    width: 100%;
+    padding: 0 8px;
+  }
+  .feed-top-tabs {
+    gap: 8px;
+    padding: 4px 10px;
+    overflow-x: auto;
+    max-width: 95vw;
+  }
+  .feed-tab-btn {
+    font-size: 12px;
+    padding: 3px 4px;
+  }
+  .studio-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .studio-monitor {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .upload-editor-layout {
+    padding: 6px 10px 24px;
+  }
+  .search-page-v2 {
+    padding: 10px 12px 32px;
+  }
+  .hot-board-grid,
+  .challenges-scroll-row,
+  .lifestyle-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 400px) {

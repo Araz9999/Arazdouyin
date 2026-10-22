@@ -9,14 +9,15 @@ import { ThumbGrid } from '../components/ThumbGrid';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { EditIcon, VerifiedIcon } from '../components/icons';
 import { pushRecent } from '../utils/recents';
-import { formatCount } from '../utils/format';
+import { formatCount, formatDuration, timeAgo } from '../utils/format';
 import { requireAuth, updateMe, useSelf } from '../store/auth';
 import { toggleFollow, useIsFollowing } from '../store/feed';
 import { toast } from '../store/ui';
+import { getWatchHistory, clearWatchHistory, removeWatchItem, type WatchHistoryItem } from '../utils/watchHistory';
 
 import { useI18n } from '../store/i18n';
 
-type Tab = 'works' | 'likes';
+type Tab = 'works' | 'likes' | 'history';
 type Rel = 'followers' | 'following';
 
 function EditPanel({ user, onDone }: { user: User; onDone: (saved: boolean) => void }) {
@@ -119,7 +120,17 @@ export default function UserPage({ params }: RouteProps) {
   const [next, setNext] = useState<string | null>(null);
   const [moreBusy, setMoreBusy] = useState(false);
   const moreCtrl = useRef<AbortController | null>(null);
-  const following = useIsFollowing(profile.data?.user.id);
+  const [history, setHistory] = useState<WatchHistoryItem[]>(() => (selfMode ? getWatchHistory() : []));
+
+  useEffect(() => {
+    if (!selfMode) return;
+    setHistory(getWatchHistory());
+    const onUpdate = (e: Event) => {
+      setHistory((e as CustomEvent<WatchHistoryItem[]>).detail ?? getWatchHistory());
+    };
+    window.addEventListener('dy:history_updated', onUpdate);
+    return () => window.removeEventListener('dy:history_updated', onUpdate);
+  }, [selfMode]);
 
   const listState = useAsync<{ items: Video[]; next: string | null }>(
     (signal) =>
@@ -130,7 +141,7 @@ export default function UserPage({ params }: RouteProps) {
           return { items: page.items, next: page.nextCursor };
         }),
     [id, tab],
-    !!id
+    !!id && tab !== 'history'
   );
 
   useEffect(
@@ -169,6 +180,7 @@ export default function UserPage({ params }: RouteProps) {
   const user = profile.data?.user;
   const stats = profile.data?.stats;
   const isSelf = !!user && !!me && user.id === me.id;
+  const following = useIsFollowing(user?.id ?? '');
 
   if (!id) return <EmptyState text={t('auth_sheet_title')} action={<button className="btn accent pill" onClick={() => navigate('/login')}>{t('nav_login')}</button>} />;
   if (profile.loading && !user) return <Loading label={t('state_loading')} />;
@@ -263,22 +275,87 @@ export default function UserPage({ params }: RouteProps) {
         <button className={`tab-btn${tab === 'likes' ? ' on' : ''}`} onClick={() => setTab('likes')}>
           {t('user_tab_likes')}
         </button>
+        {isSelf ? (
+          <button className={`tab-btn${tab === 'history' ? ' on' : ''}`} onClick={() => setTab('history')}>
+            {t('user_tab_history')} {history.length > 0 ? `(${history.length})` : ''}
+          </button>
+        ) : null}
       </div>
-      {listState.loading && !items.length ? <Loading label={t('state_loading')} /> : null}
-      {listState.error && !items.length ? <ErrorState text={listState.error} onRetry={listState.reload} /> : null}
-      {!listState.loading && !items.length ? (
-        <EmptyState text={tab === 'works' ? t('user_no_works') : t('user_no_likes')} />
-      ) : null}
-      {items.length ? (
+      {tab === 'history' ? (
+        <div className="watch-history-panel">
+          {history.length > 0 ? (
+            <div className="history-head">
+              <span className="history-count">{history.length} video</span>
+              <button
+                className="btn ghost pill small"
+                onClick={() => {
+                  clearWatchHistory();
+                  toast(t('history_cleared_toast'), 'info');
+                }}
+              >
+                {t('history_clear_all')}
+              </button>
+            </div>
+          ) : null}
+          {history.length === 0 ? (
+            <EmptyState text={t('user_no_history')} hint={t('user_no_history_hint')} />
+          ) : (
+            <div className="history-grid">
+              {history.map((item) => (
+                <div key={item.videoId} className="history-card">
+                  <div className="history-thumb-wrap" onClick={() => navigate(`/video/${item.videoId}`)}>
+                    {item.video.poster ? (
+                      <img src={item.video.poster} alt="" loading="lazy" />
+                    ) : (
+                      <div className="history-fallback-poster" />
+                    )}
+                    <span className="history-dur">{formatDuration(item.duration)}</span>
+                  </div>
+                  <div className="history-info">
+                    <p className="history-caption" onClick={() => navigate(`/video/${item.videoId}`)}>
+                      {item.video.caption || t('no_caption')}
+                    </p>
+                    <div className="history-meta">
+                      <span className="history-author">@{item.video.author.display_name || item.video.author.username}</span>
+                      <span className="history-time">{timeAgo(item.watchedAt)}</span>
+                    </div>
+                    <div className="history-actions">
+                      <button className="btn accent pill small" onClick={() => navigate(`/video/${item.videoId}`)}>
+                        {t('history_resume')}
+                      </button>
+                      <button
+                        className="btn ghost pill small"
+                        onClick={() => removeWatchItem(item.videoId)}
+                        title={t('action_delete')}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
         <>
-          <ThumbGrid items={items} />
-          {next ? (
-            <button className="btn ghost block" onClick={loadMore} disabled={moreBusy}>
-              {moreBusy ? t('state_loading') : t('search_load_more')}
-            </button>
+          {listState.loading && !items.length ? <Loading label={t('state_loading')} /> : null}
+          {listState.error && !items.length ? <ErrorState text={listState.error} onRetry={listState.reload} /> : null}
+          {!listState.loading && !items.length ? (
+            <EmptyState text={tab === 'works' ? t('user_no_works') : t('user_no_likes')} />
+          ) : null}
+          {items.length ? (
+            <>
+              <ThumbGrid items={items} />
+              {next ? (
+                <button className="btn ghost block" onClick={loadMore} disabled={moreBusy}>
+                  {moreBusy ? t('state_loading') : t('search_load_more')}
+                </button>
+              ) : null}
+            </>
           ) : null}
         </>
-      ) : null}
+      )}
     </div>
   );
 }

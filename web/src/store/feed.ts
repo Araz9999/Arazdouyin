@@ -4,8 +4,9 @@ import { createStore, useStore } from './reactive';
 import { authStore, currentUser, isAuthed, requireAuth } from './auth';
 import { toast } from './ui';
 import { t } from './i18n';
+import { recordWatch } from '../utils/watchHistory';
 
-export type FeedKind = 'recommend' | 'following';
+export type FeedKind = 'recommend' | 'following' | 'friends' | 'nearby' | 'shopping' | 'featured';
 
 export type FeedMeta = {
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -95,7 +96,8 @@ function upsertVideo(video: Video) {
 }
 
 export function feedKey(kind: FeedKind, userId?: string): string {
-  return kind === 'following' ? `following:${userId ?? currentUser()?.id ?? 'anon'}` : 'recommend';
+  if (kind === 'following') return `following:${userId ?? currentUser()?.id ?? 'anon'}`;
+  return kind;
 }
 
 export function ensureFeed(key: string, kind: FeedKind, force = false) {
@@ -355,7 +357,11 @@ export async function shareVideo(video: Video) {
 }
 
 const viewed = new Set<string>();
-export function reportView(videoId: string) {
+export function reportView(videoId: string, video?: Video, progressSec = 0) {
+  const current = video || findVideo(store.get(), videoId);
+  if (current) {
+    recordWatch(current, progressSec);
+  }
   if (viewed.has(videoId)) return;
   viewed.add(videoId);
   void videoApi

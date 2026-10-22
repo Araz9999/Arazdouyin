@@ -18,5 +18,9 @@
     "smoke": "node scripts/smoke.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "typecheck": "npm run typecheck -w web && npm run typecheck -w server"
+  },
+  "dependencies": {
+    "@google/genai": "^2.30.0",
+    "ws": "^8.22.0"
   }
 }
